@@ -29,6 +29,11 @@ public class MemberRepositoryImpl implements MemberRepository {
     }
 
     @Override
+    public Optional<Member> findByIdAndDeleteAtIsNull(UUID id) {
+        return jpaMemberRepository.findByIdAndDeleteAtIsNull(id);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return jpaMemberRepository.existsByEmail(email);
     }
