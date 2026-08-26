@@ -29,8 +29,8 @@ public class MemberRepositoryImpl implements MemberRepository {
     }
 
     @Override
-    public Optional<Member> findByIdAndDeleteAtIsNull(UUID id) {
-        return jpaMemberRepository.findByIdAndDeleteAtIsNull(id);
+    public Optional<Member> findByIdAndDeletedAtIsNull(UUID id) {
+        return jpaMemberRepository.findByIdAndDeletedAtIsNull(id);
     }
 
     @Override

@@ -6,7 +6,7 @@ import com.studymate.studymate.domain.MemberRole;
 import com.studymate.studymate.domain.MemberStatus;
 import java.util.UUID;
 
-public record MemberCreateResponse(
+public record MemberResponse(
         UUID id,
         String email,
         String nickname,
@@ -15,8 +15,8 @@ public record MemberCreateResponse(
         ActivityRegion activityRegion,
         boolean activityRegionVerified
 ) {
-    public static MemberCreateResponse from(Member member) {
-        return new MemberCreateResponse(member.getId(),
+    public static MemberResponse from(Member member) {
+        return new MemberResponse(member.getId(),
                 member.getEmail(),
                 member.getNickname(),
                 member.getRole(),
