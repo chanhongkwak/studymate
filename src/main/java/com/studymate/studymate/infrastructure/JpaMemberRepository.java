@@ -10,6 +10,6 @@ public interface JpaMemberRepository extends JpaRepository<Member, UUID> {
 
     boolean existsByEmail(String email);
 
-    Optional<Member> findByIdAndDeleteAtIsNull(UUID id);
+    Optional<Member> findByIdAndDeletedAtIsNull(UUID id);
 
 }
