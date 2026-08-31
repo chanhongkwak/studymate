@@ -1,4 +1,4 @@
-package com.studymate.studymate;
+package com.studymate.member;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

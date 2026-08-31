@@ -1,4 +1,4 @@
-package com.studymate.studymate.domain;
+package com.studymate.member.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

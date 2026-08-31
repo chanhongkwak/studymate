@@ -1,9 +1,9 @@
-package com.studymate.studymate.application.dto.response;
+package com.studymate.member.application.dto.response;
 
-import com.studymate.studymate.domain.ActivityRegion;
-import com.studymate.studymate.domain.Member;
-import com.studymate.studymate.domain.MemberRole;
-import com.studymate.studymate.domain.MemberStatus;
+import com.studymate.member.domain.ActivityRegion;
+import com.studymate.member.domain.Member;
+import com.studymate.member.domain.MemberRole;
+import com.studymate.member.domain.MemberStatus;
 import java.util.UUID;
 
 public record MemberResponse(

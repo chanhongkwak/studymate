@@ -1,7 +1,7 @@
-package com.studymate.studymate.infrastructure;
+package com.studymate.member.infrastructure;
 
-import com.studymate.studymate.domain.Member;
-import com.studymate.studymate.domain.MemberRepository;
+import com.studymate.member.domain.Member;
+import com.studymate.member.domain.MemberRepository;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

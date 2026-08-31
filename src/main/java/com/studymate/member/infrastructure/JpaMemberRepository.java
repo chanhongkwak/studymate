@@ -1,6 +1,6 @@
-package com.studymate.studymate.infrastructure;
+package com.studymate.member.infrastructure;
 
-import com.studymate.studymate.domain.Member;
+import com.studymate.member.domain.Member;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

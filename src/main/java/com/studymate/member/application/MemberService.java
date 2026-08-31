@@ -1,10 +1,10 @@
-package com.studymate.studymate.application;
+package com.studymate.member.application;
 
-import com.studymate.studymate.application.dto.request.MemberCreateRequest;
-import com.studymate.studymate.application.dto.request.MemberUpdateRequest;
-import com.studymate.studymate.application.dto.response.MemberResponse;
-import com.studymate.studymate.domain.Member;
-import com.studymate.studymate.domain.MemberRepository;
+import com.studymate.member.application.dto.request.MemberCreateRequest;
+import com.studymate.member.application.dto.request.MemberUpdateRequest;
+import com.studymate.member.application.dto.response.MemberResponse;
+import com.studymate.member.domain.Member;
+import com.studymate.member.domain.MemberRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;

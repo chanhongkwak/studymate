@@ -1,9 +1,9 @@
-package com.studymate.studymate.presentation;
+package com.studymate.member.presentation;
 
-import com.studymate.studymate.application.MemberService;
-import com.studymate.studymate.application.dto.request.MemberCreateRequest;
-import com.studymate.studymate.application.dto.request.MemberUpdateRequest;
-import com.studymate.studymate.application.dto.response.MemberResponse;
+import com.studymate.member.application.MemberService;
+import com.studymate.member.application.dto.request.MemberCreateRequest;
+import com.studymate.member.application.dto.request.MemberUpdateRequest;
+import com.studymate.member.application.dto.response.MemberResponse;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
