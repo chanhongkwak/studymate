@@ -1,6 +1,6 @@
-package com.studymate.studymate.application.dto.request;
+package com.studymate.member.application.dto.request;
 
-import com.studymate.studymate.domain.ActivityRegion;
+import com.studymate.member.domain.ActivityRegion;
 
 public record MemberUpdateRequest(
         String email,

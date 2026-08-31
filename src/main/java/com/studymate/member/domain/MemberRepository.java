@@ -1,4 +1,4 @@
-package com.studymate.studymate.domain;
+package com.studymate.member.domain;
 
 import java.util.Optional;
 import java.util.UUID;

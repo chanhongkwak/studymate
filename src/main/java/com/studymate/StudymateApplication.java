@@ -1,4 +1,4 @@
-package com.studymate.studymate;
+package com.studymate;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -8,7 +8,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class StudymateApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(StudymateApplication.class, args);
     }
 
 }
