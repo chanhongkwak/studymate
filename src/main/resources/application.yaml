@@ -1,3 +1,7 @@
 spring:
   application:
     name: studymate
+
+jwt:
+  secret: your-secret-key-must-be-long-enough
+  access-token-expiration-seconds: 3600
