@@ -1,4 +1,7 @@
-package com.studymate.auth.application;
+package com.studymate.auth.application.request;
 
-public record LoginRequest() {
+public record LoginRequest(
+        String email,
+        String password
+) {
 }

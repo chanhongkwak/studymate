@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class StudymateApplication {
 
     public static void main(String[] args) {
+        SpringApplication.run(StudymateApplication.class, args);
     }
 
 }
