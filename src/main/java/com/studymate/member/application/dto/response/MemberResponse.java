@@ -1,6 +1,6 @@
 package com.studymate.member.application.dto.response;
 
-import com.studymate.member.domain.ActivityRegion;
+import com.studymate.global.domain.ActivityRegion;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRole;
 import com.studymate.member.domain.MemberStatus;
