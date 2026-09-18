@@ -1,4 +1,4 @@
-package com.studymate.member.domain;
+package com.studymate.global.domain;
 
 public enum ActivityRegion {
     SEOUL_GANGNAM,

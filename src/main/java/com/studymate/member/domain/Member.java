@@ -1,5 +1,6 @@
 package com.studymate.member.domain;
 
+import com.studymate.global.domain.ActivityRegion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
