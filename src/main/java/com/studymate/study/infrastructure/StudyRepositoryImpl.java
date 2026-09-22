@@ -5,6 +5,8 @@ import com.studymate.study.domain.StudyRepository;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -21,5 +23,10 @@ public class StudyRepositoryImpl implements StudyRepository {
     @Override
     public Optional<Study> findByIdAndDeletedAtIsNull(UUID id) {
         return jpaStudyRepository.findByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
+    public Page<Study> findAllByDeletedAtIsNull(Pageable pageable) {
+        return jpaStudyRepository.findAllByDeletedAtIsNull(pageable);
     }
 }
