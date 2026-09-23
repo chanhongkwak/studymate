@@ -1,6 +1,7 @@
 package com.studymate.study.domain;
 
 import com.studymate.global.domain.ActivityRegion;
+import com.studymate.global.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -67,10 +68,10 @@ public class Study {
             UUID leaderMemberId,
             int maxMembers,
             ActivityRegion activityRegion
-    ){
-        validate(title,description,maxMembers,activityRegion);
+    ) {
+        validate(title, description, maxMembers, activityRegion);
 
-        if(leaderMemberId == null){
+        if (leaderMemberId == null) {
             throw new IllegalArgumentException(("스터디장 ID는 필수입니다."));
         }
 
@@ -96,16 +97,16 @@ public class Study {
             Integer maxMembers,
             ActivityRegion activityRegion,
             UUID updatedBy
-    ){
-        if(this.deletedAt != null){
-            throw new IllegalStateException("삭제된 스터디는 수정할 수 없습니다.");
+    ) {
+        if (this.deletedAt != null) {
+            throw new ConflictException("삭제된 스터디는 수정할 수 없습니다.");
         }
 
-        if(this.status == StudyStatus.ENDED){
-            throw new IllegalStateException("종료된 스터디는 수정할 수 없습니다.");
+        if (this.status == StudyStatus.ENDED) {
+            throw new ConflictException("종료된 스터디는 수정할 수 없습니다.");
         }
 
-        if(updatedBy == null){
+        if (updatedBy == null) {
             throw new IllegalArgumentException("수정자 ID는 필수입니다.");
         }
 
@@ -129,18 +130,16 @@ public class Study {
         this.updatedBy = updatedBy;
     }
 
-    public void changeStatus(StudyStatus nextStatus, UUID updatedBy){
-        if(this.deletedAt != null){
-            throw new IllegalStateException(
-                    "삭제된 스터디는 상태를 변경할 수 없습니다."
-            );
+    public void changeStatus(StudyStatus nextStatus, UUID updatedBy) {
+        if (this.deletedAt != null) {
+            throw new ConflictException("삭제된 스터디는 상태를 변경할 수 없습니다.");
         }
 
-        if(nextStatus == null){
+        if (nextStatus == null) {
             throw new IllegalArgumentException("변경할 상태는 필수입니다.");
         }
 
-        if(updatedBy == null){
+        if (updatedBy == null) {
             throw new IllegalArgumentException("수정자 ID는 필수입니다.");
         }
 
@@ -148,10 +147,8 @@ public class Study {
             return;
         }
 
-        if(this.status == StudyStatus.ENDED){
-            throw new IllegalStateException(
-                    "종료된 스터디는 상태를 변경할 수 없습니다."
-            );
+        if (this.status == StudyStatus.ENDED) {
+            throw new ConflictException("종료된 스터디는 상태를 변경할 수 없습니다.");
         }
 
         this.status = nextStatus;
@@ -159,12 +156,12 @@ public class Study {
         this.updatedBy = updatedBy;
     }
 
-    public void delete(UUID deletedBy){
-        if(this.deletedAt != null){
-            throw new IllegalStateException("이미 삭제된 스터디입니다.");
+    public void delete(UUID deletedBy) {
+        if (this.deletedAt != null) {
+            throw new ConflictException("이미 삭제된 스터디입니다.");
         }
 
-        if(deletedBy == null){
+        if (deletedBy == null) {
             throw new IllegalArgumentException("삭제자 ID는 필수입니다.");
         }
 
@@ -175,17 +172,18 @@ public class Study {
         this.updatedAt = now;
         this.updatedBy = deletedBy;
     }
+
     private void validate(
             String title,
             String description,
             int maxMembers,
             ActivityRegion activityRegion
-    ){
-        if(title == null || title.isBlank()){
+    ) {
+        if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("스터디 이름은 필수입니다.");
         }
 
-        if(title.length() > 100){
+        if (title.length() > 100) {
             throw new IllegalArgumentException(
                     "스터디 이름은 100자를 초과할 수 없습니다."
             );
@@ -201,13 +199,13 @@ public class Study {
             );
         }
 
-        if(maxMembers < 2){
+        if (maxMembers < 2) {
             throw new IllegalArgumentException(
                     "스터디 정원은 스터디장을 포함해 최소 2명입니다."
             );
         }
 
-        if(activityRegion == null){
+        if (activityRegion == null) {
             throw new IllegalArgumentException("활동 지역은 필수입니다.");
         }
     }
