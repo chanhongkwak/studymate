@@ -1,5 +1,7 @@
 package com.studymate.study.application;
 
+import com.studymate.global.exception.ForbiddenException;
+import com.studymate.global.exception.NotFoundException;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
@@ -32,18 +34,24 @@ public class StudyService {
         }
 
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("회원을 찾을 수 없습니다."));
 
         if (member.getStatus() != MemberStatus.ACTIVE) {
-            throw new IllegalStateException("활성 회원만 스터디를 생성할 수 있습니다.");
+            throw new ForbiddenException("활성 회원만 스터디를 생성할 수 있습니다.");
         }
 
         if (request.maxMembers() == null) {
             throw new IllegalArgumentException("스터디 정원은 필수입니다.");
         }
 
-        Study study = new Study(request.title(), request.description(), member.getId(), request.maxMembers(),
-                request.activityRegion());
+        Study study = new Study(
+                request.title(),
+                request.description(),
+                member.getId(),
+                request.maxMembers(),
+                request.activityRegion()
+        );
 
         studyRepository.save(study);
 
@@ -51,7 +59,11 @@ public class StudyService {
     }
 
     @Transactional
-    public StudyResponse update(UUID studyId, UUID memberId, StudyUpdateRequest request) {
+    public StudyResponse update(
+            UUID studyId,
+            UUID memberId,
+            StudyUpdateRequest request
+    ) {
         if (studyId == null) {
             throw new IllegalArgumentException("스터디 ID는 필수입니다.");
         }
@@ -60,23 +72,28 @@ public class StudyService {
         }
 
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("회원을 찾을 수 없습니다."));
 
         if (member.getStatus() != MemberStatus.ACTIVE) {
-            throw new IllegalArgumentException(
-                    "활성 회원만 스터디를 수정할 수 있습니다."
-            );
+            throw new ForbiddenException("활성 회원만 스터디를 수정할 수 있습니다.");
         }
 
         Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
-                .orElseThrow(() -> new IllegalArgumentException("스터디를 찾을 수 없습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("스터디를 찾을 수 없습니다."));
 
         if (!study.getLeaderMemberId().equals(memberId)) {
-            throw new IllegalArgumentException("스터디장만 수정할 수 있습니다.");
+            throw new ForbiddenException("스터디장만 수정할 수 있습니다.");
         }
 
-        study.update(request.title(), request.description(), request.maxMembers(), request.activityRegion(),
-                memberId);
+        study.update(
+                request.title(),
+                request.description(),
+                request.maxMembers(),
+                request.activityRegion(),
+                memberId
+        );
 
         return StudyResponse.from(study);
     }
@@ -84,11 +101,12 @@ public class StudyService {
     @Transactional(readOnly = true)
     public StudyResponse getStudy(UUID studyId) {
         if (studyId == null) {
-            throw new IllegalArgumentException("해당 스터디가 존재하지 않습니다.");
+            throw new IllegalArgumentException("스터디 ID는 필수입니다.");
         }
 
         Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 스터디가 존재하지 않습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("스터디를 찾을 수 없습니다."));
 
         return StudyResponse.from(study);
     }
@@ -106,7 +124,8 @@ public class StudyService {
         }
 
         Pageable pageable = PageRequest.of(
-                page, size,
+                page,
+                size,
                 Sort.by(
                         Sort.Order.desc("createdAt"),
                         Sort.Order.desc("id")
@@ -122,24 +141,26 @@ public class StudyService {
     @Transactional
     public void delete(UUID studyId, UUID memberId) {
         if (studyId == null) {
-            throw new IllegalArgumentException("스터디를 찾을 수 없습니다.");
+            throw new IllegalArgumentException("스터디 ID는 필수입니다.");
         }
         if (memberId == null) {
-            throw new IllegalArgumentException("회원을 찾을 수 없습니다.");
+            throw new IllegalArgumentException("회원 ID는 필수입니다.");
         }
 
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("회원을 찾을 수 없습니다."));
 
         if (member.getStatus() != MemberStatus.ACTIVE) {
-            throw new IllegalArgumentException("활성 회원만 스터디를 삭제할 수 있습니다.");
+            throw new ForbiddenException("활성 회원만 스터디를 삭제할 수 있습니다.");
         }
 
         Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
-                .orElseThrow(() -> new IllegalArgumentException("스터디를 찾을 수 없습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("스터디를 찾을 수 없습니다."));
 
-        if (!study.getLeaderMemberId().equals(member.getId())) {
-            throw new IllegalArgumentException("스터디장만 삭제할 수 있습니다.");
+        if (!study.getLeaderMemberId().equals(memberId)) {
+            throw new ForbiddenException("스터디장만 삭제할 수 있습니다.");
         }
 
         study.delete(memberId);
@@ -150,29 +171,30 @@ public class StudyService {
             UUID studyId,
             UUID memberId,
             StudyStatusUpdatedRequest request
-    ){
-        if(studyId == null){
+    ) {
+        if (studyId == null) {
             throw new IllegalArgumentException("스터디 ID는 필수입니다.");
-        }if(memberId == null){
+        }
+        if (memberId == null) {
             throw new IllegalArgumentException("회원 ID는 필수입니다.");
         }
 
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() ->
+                        new NotFoundException("회원을 찾을 수 없습니다."));
 
-        if(member.getStatus() != MemberStatus.ACTIVE){
-            throw new IllegalArgumentException("활성 회원만 스터디 상태를 변경할 수 있습니다.");
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException(
+                    "활성 회원만 스터디 상태를 변경할 수 있습니다."
+            );
         }
 
         Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("스터디를 찾을 수 없습니다.")
-                );
+                        new NotFoundException("스터디를 찾을 수 없습니다."));
 
         if (!study.getLeaderMemberId().equals(memberId)) {
-            throw new IllegalArgumentException(
-                    "스터디장만 상태를 변경할 수 있습니다."
-            );
+            throw new ForbiddenException("스터디장만 상태를 변경할 수 있습니다.");
         }
 
         study.changeStatus(request.status(), memberId);
@@ -180,5 +202,3 @@ public class StudyService {
         return StudyResponse.from(study);
     }
 }
-
-

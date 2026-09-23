@@ -1,5 +1,7 @@
 package com.studymate.member.application;
 
+import com.studymate.global.exception.ConflictException;
+import com.studymate.global.exception.NotFoundException;
 import com.studymate.member.application.dto.request.MemberCreateRequest;
 import com.studymate.member.application.dto.request.MemberUpdateRequest;
 import com.studymate.member.application.dto.response.MemberResponse;
@@ -20,7 +22,7 @@ public class MemberService {
     @Transactional
     public MemberResponse createMember(MemberCreateRequest memberCreateRequest) {
         if (memberRepository.existsByEmail(memberCreateRequest.email())) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new ConflictException("이미 사용 중인 이메일입니다.");
         }
 
         String encodedPassword = passwordEncoder.encode(memberCreateRequest.password());
@@ -36,12 +38,12 @@ public class MemberService {
     @Transactional
     public MemberResponse updateMember(UUID memberId, MemberUpdateRequest memberUpdateRequest) {
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
 
         if (memberUpdateRequest.email() != null
                 && !memberUpdateRequest.email().equals(member.getEmail())
                 && memberRepository.existsByEmail(memberUpdateRequest.email())) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new ConflictException("이미 사용 중인 이메일입니다.");
         }
 
         String encodedPassword = memberUpdateRequest.password() == null
@@ -60,7 +62,7 @@ public class MemberService {
     @Transactional(readOnly = true)
     public MemberResponse getMember(UUID memberId) {
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
 
         return MemberResponse.from(member);
     }
@@ -68,7 +70,7 @@ public class MemberService {
     @Transactional
     public void deleteMember(UUID memberId) {
         Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다"));
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
         member.delete(memberId);
     }
 }

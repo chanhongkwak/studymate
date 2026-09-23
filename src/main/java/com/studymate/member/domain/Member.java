@@ -1,6 +1,7 @@
 package com.studymate.member.domain;
 
 import com.studymate.global.domain.ActivityRegion;
+import com.studymate.global.exception.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -103,7 +104,7 @@ public class Member {
     public void delete(UUID deletedBy) {
         LocalDateTime now = LocalDateTime.now();
         if (this.status == MemberStatus.DELETED) {
-            throw new IllegalStateException("이미 삭제된 회원입니다.");
+            throw new ConflictException("이미 삭제된 회원입니다.");
         } else {
             this.status = MemberStatus.DELETED;
         }
