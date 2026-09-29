@@ -1,7 +1,7 @@
 package com.studymate.study.presentation;
 
 import com.studymate.auth.infrastructure.MemberPrincipal;
-import com.studymate.study.application.StudyService;
+import com.studymate.study.application.service.StudyService;
 import com.studymate.study.application.dto.request.StudyCreateRequest;
 import com.studymate.study.application.dto.request.StudyStatusUpdatedRequest;
 import com.studymate.study.application.dto.request.StudyUpdateRequest;

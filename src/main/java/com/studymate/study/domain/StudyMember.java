@@ -119,6 +119,11 @@ public class StudyMember {
         this.status = StudyMemberStatus.LEFT;
         this.updatedAt = LocalDateTime.now();
         this.updatedBy = leftBy;
+    }
 
+    public static StudyMember createLeader(UUID studyId, UUID memberId){
+        StudyMember leader = new StudyMember(studyId, memberId, null);
+        leader.status = StudyMemberStatus.ACTIVE;
+        return leader;
     }
 }
