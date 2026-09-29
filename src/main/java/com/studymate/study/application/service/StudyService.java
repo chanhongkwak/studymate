@@ -1,4 +1,4 @@
-package com.studymate.study.application;
+package com.studymate.study.application.service;
 
 import com.studymate.global.exception.ForbiddenException;
 import com.studymate.global.exception.NotFoundException;
@@ -10,6 +10,8 @@ import com.studymate.study.application.dto.request.StudyStatusUpdatedRequest;
 import com.studymate.study.application.dto.request.StudyUpdateRequest;
 import com.studymate.study.application.dto.response.StudyResponse;
 import com.studymate.study.domain.Study;
+import com.studymate.study.domain.StudyMember;
+import com.studymate.study.domain.StudyMemberRepository;
 import com.studymate.study.domain.StudyRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class StudyService {
 
     private final StudyRepository studyRepository;
     private final MemberRepository memberRepository;
+    private final StudyMemberRepository studyMemberRepository;
 
     @Transactional
     public StudyResponse create(UUID memberId, StudyCreateRequest request) {
@@ -54,6 +57,13 @@ public class StudyService {
         );
 
         studyRepository.save(study);
+
+        StudyMember leader = StudyMember.createLeader(
+                study.getId(),
+                study.getLeaderMemberId()
+        );
+
+        studyMemberRepository.save(leader);
 
         return StudyResponse.from(study);
     }
