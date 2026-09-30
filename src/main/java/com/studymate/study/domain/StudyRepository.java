@@ -12,4 +12,6 @@ public interface StudyRepository {
     Optional<Study> findByIdAndDeletedAtIsNull(UUID id);
 
     Page<Study> findAllByDeletedAtIsNull(Pageable pageable);
+
+    Optional<Study> findByIdForUpdate(UUID id);
 }
