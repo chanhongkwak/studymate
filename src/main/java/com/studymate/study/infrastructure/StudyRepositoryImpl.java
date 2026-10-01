@@ -29,4 +29,9 @@ public class StudyRepositoryImpl implements StudyRepository {
     public Page<Study> findAllByDeletedAtIsNull(Pageable pageable) {
         return jpaStudyRepository.findAllByDeletedAtIsNull(pageable);
     }
+
+    @Override
+    public Optional<Study> findByIdForUpdate(UUID id) {
+        return jpaStudyRepository.findByIdForUpdate(id);
+    }
 }
