@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: studymate-postgres
+    ports:
+      - "127.0.0.1:5435:5432"
+    environment:
+      POSTGRES_DB: studymate
+      POSTGRES_USER: studymate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - studymate_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  studymate_postgres_data:
