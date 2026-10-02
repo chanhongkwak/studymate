@@ -1,0 +1,23 @@
+@baseUrl = http://localhost:8080
+
+### 그룹장으로 사용할 회원 가입
+POST {{baseUrl}}/api/members
+Content-Type: application/json
+
+{
+  "email": "leader@example.com",
+  "password": "TestPass123!",
+  "nickname": "스터디장",
+  "activityRegion": "SEOUL_GANGNAM"
+}
+
+### 신청자로 사용할 회원 가입
+POST {{baseUrl}}/api/members
+Content-Type: application/json
+
+{
+  "email": "applicant@example.com",
+  "password": "TestPass123!",
+  "nickname": "신청자",
+  "activityRegion": "SEOUL_GANGNAM"
+}

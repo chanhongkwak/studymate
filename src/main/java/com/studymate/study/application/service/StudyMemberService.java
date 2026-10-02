@@ -69,6 +69,18 @@ public class StudyMemberService {
 
     @Transactional(readOnly = true)
     public StudyMemberResponse getMyLatestApplication(UUID studyId, UUID memberId) {
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() ->
+                        new NotFoundException("해당 회원을 찾을 수 없습니다."));
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원만 신청 내역을 조회할 수 있습니다.");
+        }
+
+        studyRepository.findByIdAndDeletedAtIsNull(studyId)
+                .orElseThrow(() ->
+                        new NotFoundException("해당 스터디를 찾을 수 없습니다."));
+
         StudyMember studyMember = studyMemberRepository.findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(studyId,
                         memberId)
                 .orElseThrow(() -> new NotFoundException("가입 신청 내역을 찾을 수 없습니다."));
