@@ -137,4 +137,80 @@ public class StudyMemberService {
 
         return applications.map(StudyMemberResponse::from);
     }
+
+    @Transactional
+    public StudyMemberResponse approve(UUID studyId,
+                                       UUID studyMemberId,
+                                       UUID memberId) {
+        Study study = studyRepository.findByIdForUpdate(studyId)
+                .orElseThrow(() -> new NotFoundException("해당 스터디를 찾을 수 없습니다."));
+
+        if (study.getStatus() == StudyStatus.ENDED) {
+            throw new ConflictException("종료된 스터디에서는 승인할 수 없습니다.");
+        }
+
+        StudyMember studyMember = studyMemberRepository.findById(studyMemberId)
+                .orElseThrow(() -> new NotFoundException("가입 신청 내역이 없습니다."));
+
+        if (!studyMember.getStudyId().equals(studyId)) {
+            throw new NotFoundException("해당 스터디의 가입 신청을 찾을 수 없습니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+
+        if (!study.getLeaderMemberId().equals(memberId)) {
+            throw new ForbiddenException("승인은 그룹장만 가능합니다.");
+        }
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원이 아닙니다.");
+        }
+
+        if (studyMemberRepository.countByStudyIdAndStatus(studyId, StudyMemberStatus.ACTIVE) >= study.getMaxMembers()) {
+            throw new ConflictException("정원이 다 찼습니다.");
+        }
+
+        Member applicant = memberRepository
+                .findByIdAndDeletedAtIsNull(studyMember.getMemberId())
+                .orElseThrow(() -> new NotFoundException("신청자를 찾을 수 없습니다."));
+
+        if (applicant.getStatus() != MemberStatus.ACTIVE) {
+            throw new ConflictException("활성 상태인 신청자만 승인할 수 있습니다.");
+        }
+
+        studyMember.approve(memberId);
+
+        return StudyMemberResponse.from(studyMember);
+    }
+
+    @Transactional
+    public StudyMemberResponse reject(UUID studyId, UUID studyMemberId, UUID memberId) {
+        Study study = studyRepository.findByIdForUpdate(studyId)
+                .orElseThrow(() -> new NotFoundException("해당 스터디를 찾을 수 없습니다."));
+
+        StudyMember studyMember = studyMemberRepository.findById(studyMemberId)
+                .orElseThrow(() -> new NotFoundException("가입 신청 내역이 없습니다."));
+
+        if (!studyMember.getStudyId().equals(studyId)) {
+            throw new NotFoundException("해당 스터디의 가입 신청을 찾을 수 없습니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+
+        if (!study.getLeaderMemberId().equals(memberId)) {
+            throw new ForbiddenException("거절은 그룹장만 가능합니다.");
+        }
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원이 아닙니다.");
+        }
+
+        studyMember.reject(memberId);
+
+        return StudyMemberResponse.from(studyMember);
+    }
+
+
 }
