@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -63,5 +64,33 @@ public class StudyMemberController {
                 );
 
         return ResponseEntity.ok(StudyMemberPageResponse.from(result));
+    }
+
+    @PatchMapping("/{studyMemberId}/approve")
+    public ResponseEntity<StudyMemberResponse> approve(
+            @PathVariable UUID studyId,
+            @PathVariable UUID studyMemberId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        StudyMemberResponse response = studyMemberService.approve(
+                studyId,
+                studyMemberId,
+                principal.getMemberId()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{studyMemberId}/reject")
+    public ResponseEntity<StudyMemberResponse> reject(
+            @PathVariable UUID studyId,
+            @PathVariable UUID studyMemberId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        StudyMemberResponse response = studyMemberService.reject(
+                studyId, studyMemberId, principal.getMemberId()
+        );
+
+        return ResponseEntity.ok(response);
     }
 }
