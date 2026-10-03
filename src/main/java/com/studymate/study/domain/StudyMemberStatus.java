@@ -4,5 +4,7 @@ public enum StudyMemberStatus {
     PENDING_APPROVAL,
     ACTIVE,
     REJECTED,
-    LEFT
+    LEFT,
+    COMPLETE,
+    CANCELED
 }

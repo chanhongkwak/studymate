@@ -4,6 +4,7 @@ import com.studymate.study.domain.StudyMember;
 import com.studymate.study.domain.StudyMemberRepository;
 import com.studymate.study.domain.StudyMemberStatus;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,5 +47,10 @@ public class StudyMemberRepositoryImpl implements StudyMemberRepository {
     @Override
     public Page<StudyMember> findAllByStudyIdAndStatus(UUID studyId, StudyMemberStatus status, Pageable pageable) {
         return jpaStudyMemberRepository.findAllByStudyIdAndStatus(studyId, status, pageable);
+    }
+
+    @Override
+    public List<StudyMember> findAllByStudyIdAndStatus(UUID studyId, StudyMemberStatus status) {
+        return jpaStudyMemberRepository.findAllByStudyIdAndStatus(studyId, status);
     }
 }

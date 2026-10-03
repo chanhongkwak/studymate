@@ -12,7 +12,10 @@ import com.studymate.study.application.dto.response.StudyResponse;
 import com.studymate.study.domain.Study;
 import com.studymate.study.domain.StudyMember;
 import com.studymate.study.domain.StudyMemberRepository;
+import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
+import com.studymate.study.domain.StudyStatus;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -199,15 +202,38 @@ public class StudyService {
             );
         }
 
-        Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
-                .orElseThrow(() ->
-                        new NotFoundException("스터디를 찾을 수 없습니다."));
+        Study study = studyRepository.findByIdForUpdate(studyId)
+                .orElseThrow(() -> new NotFoundException("스터디를 찾을 수 없습니다."));
 
         if (!study.getLeaderMemberId().equals(memberId)) {
             throw new ForbiddenException("스터디장만 상태를 변경할 수 있습니다.");
         }
 
+        if (study.getStatus() == request.status()) {
+            return StudyResponse.from(study);
+        }
+
         study.changeStatus(request.status(), memberId);
+
+        if (study.getStatus() == StudyStatus.ENDED) {
+            List<StudyMember> activeMembers =
+                    studyMemberRepository.findAllByStudyIdAndStatus(
+                            studyId, StudyMemberStatus.ACTIVE
+                    );
+
+            for (StudyMember studyMember : activeMembers) {
+                studyMember.complete(memberId);
+            }
+
+            List<StudyMember> pendingApplications =
+                    studyMemberRepository.findAllByStudyIdAndStatus(
+                            studyId, StudyMemberStatus.PENDING_APPROVAL
+                    );
+
+            for (StudyMember application : pendingApplications) {
+                application.cancelByStudyEnd(memberId);
+            }
+        }
 
         return StudyResponse.from(study);
     }
