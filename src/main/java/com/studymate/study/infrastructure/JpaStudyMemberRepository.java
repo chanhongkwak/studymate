@@ -3,6 +3,7 @@ package com.studymate.study.infrastructure;
 import com.studymate.study.domain.StudyMember;
 import com.studymate.study.domain.StudyMemberStatus;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -28,5 +29,10 @@ public interface JpaStudyMemberRepository extends JpaRepository<StudyMember, UUI
             UUID studyId,
             StudyMemberStatus status,
             Pageable pageable
+    );
+
+    List<StudyMember> findAllByStudyIdAndStatus(
+            UUID studyId,
+            StudyMemberStatus status
     );
 }
