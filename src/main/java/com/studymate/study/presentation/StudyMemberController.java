@@ -22,12 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/studies/{studyId}/members/applications")
+@RequestMapping("/api/studies/{studyId}/members")
 public class StudyMemberController {
 
     private final StudyMemberService studyMemberService;
 
-    @PostMapping()
+    @PostMapping("/applications")
     public ResponseEntity<StudyMemberResponse> apply(@AuthenticationPrincipal MemberPrincipal principal,
                                                      @PathVariable UUID studyId,
                                                      @RequestBody StudyMemberRequest request) {
@@ -37,7 +37,7 @@ public class StudyMemberController {
         return ResponseEntity.status(HttpStatus.CREATED).body(studyMemberResponse);
     }
 
-    @GetMapping("/me")
+    @GetMapping("/applications/me")
     public ResponseEntity<StudyMemberResponse> getMyLatestApplication(
             @PathVariable UUID studyId,
             @AuthenticationPrincipal MemberPrincipal principal
@@ -48,7 +48,7 @@ public class StudyMemberController {
         return ResponseEntity.ok(studyMemberResponse);
     }
 
-    @GetMapping("/pending")
+    @GetMapping("/applications/pending")
     public ResponseEntity<StudyMemberPageResponse> getPendingApplications(
             @PathVariable UUID studyId,
             @AuthenticationPrincipal MemberPrincipal principal,
@@ -66,7 +66,7 @@ public class StudyMemberController {
         return ResponseEntity.ok(StudyMemberPageResponse.from(result));
     }
 
-    @PatchMapping("/{studyMemberId}/approve")
+    @PatchMapping("/applications/{studyMemberId}/approve")
     public ResponseEntity<StudyMemberResponse> approve(
             @PathVariable UUID studyId,
             @PathVariable UUID studyMemberId,
@@ -81,7 +81,7 @@ public class StudyMemberController {
         return ResponseEntity.ok(response);
     }
 
-    @PatchMapping("/{studyMemberId}/reject")
+    @PatchMapping("/applications/{studyMemberId}/reject")
     public ResponseEntity<StudyMemberResponse> reject(
             @PathVariable UUID studyId,
             @PathVariable UUID studyMemberId,
@@ -93,4 +93,15 @@ public class StudyMemberController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PatchMapping("/me/leave")
+    public ResponseEntity<StudyMemberResponse> leave(
+            @PathVariable UUID studyId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        StudyMemberResponse response = studyMemberService.leave(studyId, principal.getMemberId());
+
+        return ResponseEntity.ok(response);
+    }
+
 }
