@@ -1,6 +1,7 @@
 package com.studymate.study.presentation;
 
 import com.studymate.auth.infrastructure.MemberPrincipal;
+import com.studymate.study.application.dto.request.StudyLeadershipTransferRequest;
 import com.studymate.study.application.service.StudyService;
 import com.studymate.study.application.dto.request.StudyCreateRequest;
 import com.studymate.study.application.dto.request.StudyStatusUpdatedRequest;
@@ -98,4 +99,18 @@ public class StudyController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/{studyId}/leader")
+    public ResponseEntity<StudyResponse> transferLeadership(
+            @PathVariable UUID studyId,
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @RequestBody StudyLeadershipTransferRequest request
+            ){
+        StudyResponse response = studyService.transferLeadership(
+                studyId,
+                principal.getMemberId(),
+                request
+        );
+
+        return ResponseEntity.ok(response);
+    }
 }

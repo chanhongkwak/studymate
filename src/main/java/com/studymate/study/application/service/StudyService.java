@@ -1,11 +1,13 @@
 package com.studymate.study.application.service;
 
+import com.studymate.global.exception.ConflictException;
 import com.studymate.global.exception.ForbiddenException;
 import com.studymate.global.exception.NotFoundException;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
 import com.studymate.study.application.dto.request.StudyCreateRequest;
+import com.studymate.study.application.dto.request.StudyLeadershipTransferRequest;
 import com.studymate.study.application.dto.request.StudyStatusUpdatedRequest;
 import com.studymate.study.application.dto.request.StudyUpdateRequest;
 import com.studymate.study.application.dto.response.StudyResponse;
@@ -92,7 +94,7 @@ public class StudyService {
             throw new ForbiddenException("활성 회원만 스터디를 수정할 수 있습니다.");
         }
 
-        Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
+        Study study = studyRepository.findByIdForUpdate(studyId)
                 .orElseThrow(() ->
                         new NotFoundException("스터디를 찾을 수 없습니다."));
 
@@ -168,7 +170,7 @@ public class StudyService {
             throw new ForbiddenException("활성 회원만 스터디를 삭제할 수 있습니다.");
         }
 
-        Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
+        Study study = studyRepository.findByIdForUpdate(studyId)
                 .orElseThrow(() ->
                         new NotFoundException("스터디를 찾을 수 없습니다."));
 
@@ -237,4 +239,60 @@ public class StudyService {
 
         return StudyResponse.from(study);
     }
+
+    @Transactional
+    public StudyResponse transferLeadership(
+            UUID studyId,
+            UUID memberId,
+            StudyLeadershipTransferRequest request
+    ) {
+        if (studyId == null) {
+            throw new IllegalArgumentException("스터디 ID는 필수입니다.");
+        }
+
+        Study study = studyRepository.findByIdForUpdate(studyId)
+                .orElseThrow(() -> new NotFoundException("스터디를 찾을 수 없습니다."));
+
+        if (memberId == null) {
+            throw new IllegalArgumentException("위임 요청자 ID는 필수입니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("위임 요청자를 찾을 수 없습니다."));
+
+        if (request.newLeaderMemberId() == null) {
+            throw new IllegalArgumentException("새 그룹장 ID는 필수입니다.");
+        }
+
+        if (!study.getLeaderMemberId().equals(memberId)) {
+            throw new ForbiddenException("그룹장만 위임할 수 있습니다.");
+        }
+
+        Member newLeader = memberRepository.findByIdAndDeletedAtIsNull(request.newLeaderMemberId())
+                .orElseThrow(() -> new NotFoundException("위임 대상 회원을 찾을 수 없습니다."));
+
+        if (newLeader.getStatus() != MemberStatus.ACTIVE) {
+            throw new ConflictException("활성 상태인 회원에게만 그룹장을 위임할 수 있습니다.");
+        }
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원만 그룹장을 위임할 수 있습니다.");
+        }
+
+        boolean participating =
+                studyMemberRepository.existsByStudyIdAndMemberIdAndStatusIn(
+                        studyId,
+                        request.newLeaderMemberId(),
+                        List.of(StudyMemberStatus.ACTIVE)
+                );
+
+        if (!participating) {
+            throw new ConflictException("해당 스터디의 활동 중인 참여자에게만 위임할 수 있습니다.");
+        }
+
+        study.transferLeadership(request.newLeaderMemberId(), memberId);
+
+        return StudyResponse.from(study);
+    }
+
 }

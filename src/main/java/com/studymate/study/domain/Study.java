@@ -2,6 +2,7 @@ package com.studymate.study.domain;
 
 import com.studymate.global.domain.ActivityRegion;
 import com.studymate.global.exception.ConflictException;
+import com.studymate.global.exception.ForbiddenException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -171,6 +172,36 @@ public class Study {
         this.deletedBy = deletedBy;
         this.updatedAt = now;
         this.updatedBy = deletedBy;
+    }
+
+    public void transferLeadership(UUID newLeaderMemberId, UUID transferredBy) {
+        if (newLeaderMemberId == null) {
+            throw new IllegalArgumentException("새 그룹장 ID는 필수입니다.");
+        }
+
+        if (transferredBy == null) {
+            throw new IllegalArgumentException("위임 요청자 ID는 필수입니다.");
+        }
+
+        if (!this.leaderMemberId.equals(transferredBy)) {
+            throw new ForbiddenException("그룹장만 위임 할 수 있습니다.");
+        }
+
+        if (this.leaderMemberId.equals(newLeaderMemberId)) {
+            throw new ConflictException("자기 자신에게 그룹장을 위임할 수 없습니다.");
+        }
+
+        if (status == StudyStatus.ENDED) {
+            throw new ConflictException("이미 종료된 스터디입니다.");
+        }
+
+        if (this.deletedAt != null) {
+            throw new ConflictException("삭제된 스터디에서는 위임할 수 없습니다.");
+        }
+
+        this.leaderMemberId = newLeaderMemberId;
+        this.updatedAt = LocalDateTime.now();
+        this.updatedBy = transferredBy;
     }
 
     private void validate(
