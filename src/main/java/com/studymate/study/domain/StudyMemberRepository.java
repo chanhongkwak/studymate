@@ -1,6 +1,7 @@
 package com.studymate.study.domain;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -29,5 +30,10 @@ public interface StudyMemberRepository {
             UUID studyId,
             StudyMemberStatus status,
             Pageable pageable
+    );
+
+    List<StudyMember> findAllByStudyIdAndStatus(
+            UUID studyId,
+            StudyMemberStatus status
     );
 }

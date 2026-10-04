@@ -121,7 +121,35 @@ public class StudyMember {
         this.updatedBy = leftBy;
     }
 
-    public static StudyMember createLeader(UUID studyId, UUID memberId){
+    public void complete(UUID completedBy) {
+        if (completedBy == null) {
+            throw new IllegalArgumentException("완료자 ID는 필수입니다.");
+        }
+
+        if (this.status != StudyMemberStatus.ACTIVE) {
+            throw new ConflictException("활동 상태에서만 완료할 수 있습니다.");
+        }
+
+        this.status = StudyMemberStatus.COMPLETE;
+        this.updatedBy = completedBy;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void cancelByStudyEnd(UUID canceledBy){
+        if(canceledBy == null){
+            throw new IllegalArgumentException("취소 처리자 ID는 필수입니다.");
+        }
+
+        if(this.status != StudyMemberStatus.PENDING_APPROVAL){
+            throw new ConflictException("승인 대기 상태가 아닙니다.");
+        }
+
+        this.status = StudyMemberStatus.CANCELED;
+        this.updatedAt = LocalDateTime.now();
+        this.updatedBy = canceledBy;
+    }
+
+    public static StudyMember createLeader(UUID studyId, UUID memberId) {
         StudyMember leader = new StudyMember(studyId, memberId, null);
         leader.status = StudyMemberStatus.ACTIVE;
         return leader;
