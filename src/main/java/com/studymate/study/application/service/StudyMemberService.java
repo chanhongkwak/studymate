@@ -212,5 +212,36 @@ public class StudyMemberService {
         return StudyMemberResponse.from(studyMember);
     }
 
+    @Transactional
+    public StudyMemberResponse leave(UUID studyId, UUID memberId) {
+        if (studyId == null) {
+            throw new IllegalArgumentException("스터디 ID는 필수입니다.");
+        }
 
+        Study study = studyRepository.findByIdForUpdate(studyId)
+                .orElseThrow(() -> new NotFoundException("해당 스터디를 찾을 수 없습니다."));
+
+        if (memberId == null) {
+            throw new IllegalArgumentException("회원 ID는 필수입니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("해당 회원을 찾을 수 없습니다."));
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원만 탈퇴를 할 수 있습니다.");
+        }
+
+        if (study.getLeaderMemberId().equals(memberId)) {
+            throw new ConflictException("그룹장은 스터디를 탈퇴할 수 없습니다.");
+        }
+
+        StudyMember studyMember = studyMemberRepository.findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(studyId,
+                        memberId)
+                .orElseThrow(() -> new NotFoundException("해당 스터디의 참여 내역을 찾을 수 없습니다."));
+
+        studyMember.leave(memberId);
+
+        return StudyMemberResponse.from(studyMember);
+    }
 }
