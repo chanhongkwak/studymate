@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -28,5 +30,33 @@ public class MeetingRepositoryImpl implements MeetingRepository {
     @Override
     public Optional<Meeting> findById(UUID meetingId) {
         return jpaMeetingRepository.findById(meetingId);
+    }
+
+    @Override
+    public Page<Meeting> findAllByStudyId(UUID studyId, Pageable pageable) {
+        return jpaMeetingRepository.findAllByStudyId(studyId, pageable);
+    }
+
+    @Override
+    public Page<Meeting> findAllByStudyIdAndEndAtLessThanEqual(UUID studyId, LocalDateTime endAt, Pageable pageable) {
+        return jpaMeetingRepository.findAllByStudyIdAndEndAtLessThanEqual(
+                studyId, endAt, pageable
+        );
+    }
+
+    @Override
+    public boolean existsOverlappingMeetingExcludingId(
+            UUID studyId,
+            UUID meetingId,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
+        return jpaMeetingRepository.existsOverlappingMeetingExcludingId(
+                studyId,
+                meetingId,
+                startAt,
+                endAt,
+                MeetingStatus.CANCELED
+        );
     }
 }
