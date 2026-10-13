@@ -3,6 +3,9 @@ package com.studymate.study.application.service;
 import com.studymate.global.exception.ConflictException;
 import com.studymate.global.exception.ForbiddenException;
 import com.studymate.global.exception.NotFoundException;
+import com.studymate.meeting.domain.Meeting;
+import com.studymate.meeting.domain.MeetingRepository;
+import com.studymate.meeting.domain.MeetingStatus;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
@@ -17,6 +20,7 @@ import com.studymate.study.domain.StudyMemberRepository;
 import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +38,7 @@ public class StudyService {
     private final StudyRepository studyRepository;
     private final MemberRepository memberRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final MeetingRepository meetingRepository;
 
     @Transactional
     public StudyResponse create(UUID memberId, StudyCreateRequest request) {
@@ -218,6 +223,8 @@ public class StudyService {
         study.changeStatus(request.status(), memberId);
 
         if (study.getStatus() == StudyStatus.ENDED) {
+            LocalDateTime endedAt = LocalDateTime.now();
+
             List<StudyMember> activeMembers =
                     studyMemberRepository.findAllByStudyIdAndStatus(
                             studyId, StudyMemberStatus.ACTIVE
@@ -234,6 +241,17 @@ public class StudyService {
 
             for (StudyMember application : pendingApplications) {
                 application.cancelByStudyEnd(memberId);
+            }
+
+            List<Meeting> scheduledMeetings =
+                    meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
+                            studyId,
+                            MeetingStatus.SCHEDULED,
+                            endedAt
+                    );
+
+            for (Meeting meeting : scheduledMeetings) {
+                meeting.cancel(memberId, endedAt);
             }
         }
 

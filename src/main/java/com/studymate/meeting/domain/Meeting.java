@@ -170,21 +170,25 @@ public class Meeting {
     }
 
     public void cancel(UUID canceledBy) {
+        cancel(canceledBy, LocalDateTime.now());
+    }
+
+    public void cancel(UUID canceledBy, LocalDateTime canceledAt) {
         if (canceledBy == null) {
-            throw new IllegalArgumentException("취소자ID는 필수입니다.");
+            throw new IllegalArgumentException("취소자 ID는 필수입니다.");
+        }
+        if (canceledAt == null) {
+            throw new IllegalArgumentException("취소 시각은 필수입니다.");
         }
         if (this.status == MeetingStatus.CANCELED) {
             throw new ConflictException("이미 취소된 일정입니다.");
         }
-
-        LocalDateTime now = LocalDateTime.now();
-
-        if (!this.startAt.isAfter(now)) {
+        if (!this.startAt.isAfter(canceledAt)) {
             throw new ConflictException("이미 시작된 일정입니다.");
         }
 
         this.status = MeetingStatus.CANCELED;
-        this.updatedAt = now;
+        this.updatedAt = canceledAt;
         this.updatedBy = canceledBy;
     }
 }
