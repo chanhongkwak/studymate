@@ -1,6 +1,7 @@
 package com.studymate.meeting.domain;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -33,5 +34,11 @@ public interface MeetingRepository {
             UUID meetingId,
             LocalDateTime startAt,
             LocalDateTime endAt
+    );
+
+    List<Meeting> findAllByStudyIdAndStatusAndStartAtAfter(
+            UUID studyId,
+            MeetingStatus status,
+            LocalDateTime startAt
     );
 }

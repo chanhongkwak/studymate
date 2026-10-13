@@ -4,6 +4,7 @@ import com.studymate.meeting.domain.Meeting;
 import com.studymate.meeting.domain.MeetingRepository;
 import com.studymate.meeting.domain.MeetingStatus;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,14 @@ public class MeetingRepositoryImpl implements MeetingRepository {
                 startAt,
                 endAt,
                 MeetingStatus.CANCELED
+        );
+    }
+
+    @Override
+    public List<Meeting> findAllByStudyIdAndStatusAndStartAtAfter(UUID studyId, MeetingStatus status,
+                                                                  LocalDateTime startAt) {
+        return jpaMeetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
+                studyId, status, startAt
         );
     }
 }
