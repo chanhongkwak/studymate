@@ -8,6 +8,9 @@ import com.studymate.meeting.application.dto.request.MeetingUpdateRequest;
 import com.studymate.meeting.application.dto.response.MeetingResponse;
 import com.studymate.meeting.domain.Meeting;
 import com.studymate.meeting.domain.MeetingRepository;
+import com.studymate.meeting.domain.MeetingRsvp;
+import com.studymate.meeting.domain.MeetingRsvpRepository;
+import com.studymate.meeting.domain.MeetingRsvpStatus;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
@@ -35,6 +38,7 @@ public class MeetingService {
     private final MemberRepository memberRepository;
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final MeetingRsvpRepository meetingRsvpRepository;
 
     @Transactional
     public MeetingResponse create(UUID studyId, UUID memberId, MeetingCreateRequest request) {
@@ -81,6 +85,17 @@ public class MeetingService {
         }
 
         meetingRepository.save(meeting);
+
+        MeetingRsvp leaderRsvp = new MeetingRsvp(
+                meeting.getId(),           // 저장한 모임 ID
+                study.getLeaderMemberId(), // 응답 대상: 현재 그룹장
+                MeetingRsvpStatus.ATTENDING,
+                null,                      // 참석이므로 불참 사유 없음
+                memberId                   // 생성 처리자
+        );
+
+        meetingRsvpRepository.save(leaderRsvp);
+
         return MeetingResponse.from(meeting);
     }
 
