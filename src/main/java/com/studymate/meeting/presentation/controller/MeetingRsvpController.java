@@ -4,6 +4,7 @@ import com.studymate.auth.infrastructure.MemberPrincipal;
 import com.studymate.meeting.application.dto.request.MeetingRsvpCreateRequest;
 import com.studymate.meeting.application.dto.request.MeetingRsvpUpdateRequest;
 import com.studymate.meeting.application.dto.response.MeetingRsvpResponse;
+import com.studymate.meeting.application.dto.response.MeetingRsvpSummaryResponse;
 import com.studymate.meeting.application.service.MeetingRsvpService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -65,6 +66,21 @@ public class MeetingRsvpController {
             @AuthenticationPrincipal MemberPrincipal principal
     ) {
         MeetingRsvpResponse response = meetingRsvpService.getMyRsvp(
+                studyId,
+                meetingId,
+                principal.getMemberId()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<MeetingRsvpSummaryResponse> getRsvpSummary(
+            @PathVariable UUID studyId,
+            @PathVariable UUID meetingId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        MeetingRsvpSummaryResponse response = meetingRsvpService.getRsvpSummary(
                 studyId,
                 meetingId,
                 principal.getMemberId()

@@ -2,6 +2,7 @@ package com.studymate.meeting.infrastructure;
 
 import com.studymate.meeting.domain.MeetingRsvp;
 import com.studymate.meeting.domain.MeetingRsvpRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,5 +26,10 @@ public class MeetingRsvpRepositoryImpl implements MeetingRsvpRepository {
     @Override
     public void deleteByMeetingIdAndMemberIdNot(UUID meetingId, UUID memberId) {
         jpaMeetingRsvpRepository.deleteByMeetingIdAndMemberIdNot(meetingId, memberId);
+    }
+
+    @Override
+    public List<MeetingRsvp> findAllByMeetingId(UUID meetingId) {
+        return jpaMeetingRsvpRepository.findAllByMeetingId(meetingId);
     }
 }

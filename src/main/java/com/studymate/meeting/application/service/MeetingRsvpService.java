@@ -6,6 +6,7 @@ import com.studymate.global.exception.NotFoundException;
 import com.studymate.meeting.application.dto.request.MeetingRsvpCreateRequest;
 import com.studymate.meeting.application.dto.request.MeetingRsvpUpdateRequest;
 import com.studymate.meeting.application.dto.response.MeetingRsvpResponse;
+import com.studymate.meeting.application.dto.response.MeetingRsvpSummaryResponse;
 import com.studymate.meeting.domain.Meeting;
 import com.studymate.meeting.domain.MeetingRepository;
 import com.studymate.meeting.domain.MeetingRsvp;
@@ -22,6 +23,10 @@ import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -232,5 +237,110 @@ public class MeetingRsvpService {
         return meetingRsvpRepository.findByMeetingIdAndMemberId(meetingId, memberId)
                 .map(MeetingRsvpResponse::from)
                 .orElseGet(() -> MeetingRsvpResponse.unanswered(meetingId, memberId));
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingRsvpSummaryResponse getRsvpSummary(
+            UUID studyId,
+            UUID meetingId,
+            UUID memberId
+    ){
+        if(studyId == null){
+            throw new IllegalArgumentException("스터디ID는 필수입니다.");
+        }
+        if(meetingId == null){
+            throw new IllegalArgumentException("모임ID는 필수입니다.");
+        }
+        if(memberId == null){
+            throw new IllegalArgumentException("회원ID는 필수입니다.");
+        }
+
+        Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
+                .orElseThrow(() -> new NotFoundException("스터디를 찾을 수 없습니다."));
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("해당 회원을 찾을 수 없습니다."));
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원만 참석 응답을 조회할 수 있습니다.");
+        }
+
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new NotFoundException("해당 모임을 찾을 수 없습니다."));
+
+        if (!meeting.getStudyId().equals(studyId)) {
+            throw new NotFoundException("해당 스터디의 모임을 찾을 수 없습니다.");
+        }
+
+        StudyMember studyMember = studyMemberRepository
+                .findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(studyId, memberId)
+                .orElseThrow(() -> new NotFoundException("해당 스터디회원을 찾을 수 없습니다."));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        boolean activeParticipant = study.getStatus() != StudyStatus.ENDED
+                && studyMember.getStatus() == StudyMemberStatus.ACTIVE;
+
+        boolean completedParticipant = study.getStatus() == StudyStatus.ENDED
+                && studyMember.getStatus() == StudyMemberStatus.COMPLETE
+                && !meeting.getEndAt().isAfter(now);
+
+        if (!activeParticipant && !completedParticipant) {
+            throw new ForbiddenException("참석 응답을 조회할 권한이 없습니다.");
+        }
+
+        StudyMemberStatus participantStatus =
+                study.getStatus() == StudyStatus.ENDED
+                ? StudyMemberStatus.COMPLETE
+                        : StudyMemberStatus.ACTIVE;
+
+        List<StudyMember> participants =
+                studyMemberRepository.findAllByStudyIdAndStatus(
+                        studyId,
+                        participantStatus
+                );
+
+        List<MeetingRsvp> rsvps = meetingRsvpRepository.findAllByMeetingId(meetingId);
+
+        Map<UUID, MeetingRsvp> rsvpByMemberId = new HashMap<>();
+
+        for(MeetingRsvp rsvp : rsvps){
+            rsvpByMemberId.put(rsvp.getMemberId(), rsvp);
+        }
+
+        List<MeetingRsvpResponse> members = new ArrayList<>();
+
+        int attendingCount = 0;
+        int notAttendingCount = 0;
+        int unansweredCount = 0;
+
+        for (StudyMember participant : participants) {
+            UUID participantMemberId = participant.getMemberId();
+            MeetingRsvp rsvp = rsvpByMemberId.get(participantMemberId);
+
+            if (rsvp == null) {
+                members.add(MeetingRsvpResponse.unanswered(
+                        meetingId,
+                        participantMemberId
+                ));
+                unansweredCount++;
+            } else {
+                members.add(MeetingRsvpResponse.from(rsvp));
+
+                if (rsvp.getStatus() == MeetingRsvpStatus.ATTENDING) {
+                    attendingCount++;
+                } else {
+                    notAttendingCount++;
+                }
+            }
+        }
+
+        return new MeetingRsvpSummaryResponse(
+                meetingId,
+                attendingCount,
+                notAttendingCount,
+                unansweredCount,
+                members
+        );
     }
 }
