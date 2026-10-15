@@ -7,4 +7,9 @@ public interface MeetingRsvpRepository {
     MeetingRsvp save(MeetingRsvp meetingRsvp);
 
     Optional<MeetingRsvp> findByMeetingIdAndMemberId(UUID meetingId, UUID memberId);
+
+    void deleteByMeetingIdAndMemberIdNot(
+            UUID meetingId,
+            UUID memberId
+    );
 }
