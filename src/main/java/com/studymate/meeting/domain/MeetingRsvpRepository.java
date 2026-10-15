@@ -1,5 +1,6 @@
 package com.studymate.meeting.domain;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +13,6 @@ public interface MeetingRsvpRepository {
             UUID meetingId,
             UUID memberId
     );
+
+    List<MeetingRsvp> findAllByMeetingId(UUID meetingId);
 }
