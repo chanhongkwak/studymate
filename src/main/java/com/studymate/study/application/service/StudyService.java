@@ -5,6 +5,9 @@ import com.studymate.global.exception.ForbiddenException;
 import com.studymate.global.exception.NotFoundException;
 import com.studymate.meeting.domain.Meeting;
 import com.studymate.meeting.domain.MeetingRepository;
+import com.studymate.meeting.domain.MeetingRsvp;
+import com.studymate.meeting.domain.MeetingRsvpRepository;
+import com.studymate.meeting.domain.MeetingRsvpStatus;
 import com.studymate.meeting.domain.MeetingStatus;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
@@ -22,6 +25,7 @@ import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,6 +43,7 @@ public class StudyService {
     private final MemberRepository memberRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRepository meetingRepository;
+    private final MeetingRsvpRepository meetingRsvpRepository;
 
     @Transactional
     public StudyResponse create(UUID memberId, StudyCreateRequest request) {
@@ -310,7 +315,42 @@ public class StudyService {
 
         study.transferLeadership(request.newLeaderMemberId(), memberId);
 
+        LocalDateTime transferredAt = LocalDateTime.now();
+
+        List<Meeting> scheduledMeetings =
+                meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
+                        studyId,
+                        MeetingStatus.SCHEDULED,
+                        transferredAt
+                );
+
+        for (Meeting meeting : scheduledMeetings) {
+            Optional<MeetingRsvp> existingRsvp = meetingRsvpRepository
+                    .findByMeetingIdAndMemberId(
+                            meeting.getId(),
+                            request.newLeaderMemberId()
+                    );
+
+            if (existingRsvp.isPresent()) {
+                MeetingRsvp rsvp = existingRsvp.get();
+
+                rsvp.update(
+                        MeetingRsvpStatus.ATTENDING,
+                        null,
+                        memberId
+                );
+            } else {
+                MeetingRsvp rsvp = new MeetingRsvp(
+                        meeting.getId(),
+                        request.newLeaderMemberId(),
+                        MeetingRsvpStatus.ATTENDING,
+                        null,
+                        memberId
+                );
+
+                meetingRsvpRepository.save(rsvp);
+            }
+        }
         return StudyResponse.from(study);
     }
-
 }
