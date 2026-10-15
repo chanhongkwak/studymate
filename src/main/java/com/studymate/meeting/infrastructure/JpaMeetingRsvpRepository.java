@@ -15,4 +15,8 @@ public interface JpaMeetingRsvpRepository extends JpaRepository<MeetingRsvp, UUI
     );
 
     List<MeetingRsvp> findAllByMeetingId(UUID meetingId);
+
+    void deleteByMeetingIdAndMemberId(
+            UUID meetingId, UUID memberId
+    );
 }

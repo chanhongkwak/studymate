@@ -32,4 +32,9 @@ public class MeetingRsvpRepositoryImpl implements MeetingRsvpRepository {
     public List<MeetingRsvp> findAllByMeetingId(UUID meetingId) {
         return jpaMeetingRsvpRepository.findAllByMeetingId(meetingId);
     }
+
+    @Override
+    public void deleteByMeetingIdAndMemberId(UUID meetingId, UUID memberId) {
+        jpaMeetingRsvpRepository.deleteByMeetingIdAndMemberId(meetingId, memberId);
+    }
 }

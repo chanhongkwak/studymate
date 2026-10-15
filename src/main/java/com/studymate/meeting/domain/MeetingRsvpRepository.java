@@ -15,4 +15,8 @@ public interface MeetingRsvpRepository {
     );
 
     List<MeetingRsvp> findAllByMeetingId(UUID meetingId);
+
+    void deleteByMeetingIdAndMemberId(
+            UUID meetingId, UUID memberId
+    );
 }
