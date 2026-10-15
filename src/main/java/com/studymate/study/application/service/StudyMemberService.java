@@ -3,6 +3,10 @@ package com.studymate.study.application.service;
 import com.studymate.global.exception.ConflictException;
 import com.studymate.global.exception.ForbiddenException;
 import com.studymate.global.exception.NotFoundException;
+import com.studymate.meeting.domain.Meeting;
+import com.studymate.meeting.domain.MeetingRepository;
+import com.studymate.meeting.domain.MeetingRsvpRepository;
+import com.studymate.meeting.domain.MeetingStatus;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
@@ -14,6 +18,7 @@ import com.studymate.study.domain.StudyMemberRepository;
 import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +36,8 @@ public class StudyMemberService {
     private final MemberRepository memberRepository;
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final MeetingRepository meetingRepository;
+    private final MeetingRsvpRepository meetingRsvpRepository;
 
     @Transactional
     public StudyMemberResponse apply(UUID studyId, UUID memberId, StudyMemberRequest request) {
@@ -241,6 +248,22 @@ public class StudyMemberService {
                 .orElseThrow(() -> new NotFoundException("해당 스터디의 참여 내역을 찾을 수 없습니다."));
 
         studyMember.leave(memberId);
+
+        LocalDateTime leftAt = LocalDateTime.now();
+
+        List<Meeting> scheduledMeetings =
+                meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
+                        studyId,
+                        MeetingStatus.SCHEDULED,
+                        leftAt
+                );
+
+        for (Meeting meeting : scheduledMeetings) {
+            meetingRsvpRepository.deleteByMeetingIdAndMemberId(
+                    meeting.getId(),
+                    memberId
+            );
+        }
 
         return StudyMemberResponse.from(studyMember);
     }
