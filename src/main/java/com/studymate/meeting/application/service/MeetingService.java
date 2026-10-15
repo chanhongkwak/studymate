@@ -264,6 +264,10 @@ public class MeetingService {
             throw new NotFoundException("해당 스터디의 모임을 찾을 수 없습니다.");
         }
 
+        LocalDateTime previousStartAt = meeting.getStartAt();
+        LocalDateTime previousEndAt = meeting.getEndAt();
+        String previousLocation = meeting.getLocation();
+
         meeting.update(
                 request.title(),
                 request.description(),
@@ -280,6 +284,18 @@ public class MeetingService {
                 meeting.getEndAt()
         )) {
             throw new ConflictException("시간이 겹치는 모임이 존재합니다.");
+        }
+
+        boolean scheduleChanged =
+                !previousStartAt.equals(meeting.getStartAt())
+                        || !previousEndAt.equals(meeting.getEndAt())
+                        || !previousLocation.equals(meeting.getLocation());
+
+        if (scheduleChanged) {
+            meetingRsvpRepository.deleteByMeetingIdAndMemberIdNot(
+                    meetingId,
+                    study.getLeaderMemberId()
+            );
         }
 
         return MeetingResponse.from(meeting);

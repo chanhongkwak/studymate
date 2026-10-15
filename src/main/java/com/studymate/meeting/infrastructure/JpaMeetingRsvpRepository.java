@@ -7,4 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JpaMeetingRsvpRepository extends JpaRepository<MeetingRsvp, UUID> {
     Optional<MeetingRsvp> findByMeetingIdAndMemberId(UUID meetingId, UUID memberId);
+
+    void deleteByMeetingIdAndMemberIdNot(
+            UUID meetingId,
+            UUID memberId
+    );
 }

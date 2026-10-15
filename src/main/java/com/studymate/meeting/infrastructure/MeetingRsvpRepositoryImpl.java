@@ -21,4 +21,9 @@ public class MeetingRsvpRepositoryImpl implements MeetingRsvpRepository {
     public Optional<MeetingRsvp> findByMeetingIdAndMemberId(UUID meetingId, UUID memberId) {
         return jpaMeetingRsvpRepository.findByMeetingIdAndMemberId(meetingId, memberId);
     }
+
+    @Override
+    public void deleteByMeetingIdAndMemberIdNot(UUID meetingId, UUID memberId) {
+        jpaMeetingRsvpRepository.deleteByMeetingIdAndMemberIdNot(meetingId, memberId);
+    }
 }
