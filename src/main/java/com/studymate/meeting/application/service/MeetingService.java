@@ -1,4 +1,4 @@
-package com.studymate.meeting.application;
+package com.studymate.meeting.application.service;
 
 import com.studymate.global.exception.ConflictException;
 import com.studymate.global.exception.ForbiddenException;

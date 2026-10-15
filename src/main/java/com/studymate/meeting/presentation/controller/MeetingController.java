@@ -1,7 +1,7 @@
-package com.studymate.meeting.presentation;
+package com.studymate.meeting.presentation.controller;
 
 import com.studymate.auth.infrastructure.MemberPrincipal;
-import com.studymate.meeting.application.MeetingService;
+import com.studymate.meeting.application.service.MeetingService;
 import com.studymate.meeting.application.dto.request.MeetingCreateRequest;
 import com.studymate.meeting.application.dto.request.MeetingUpdateRequest;
 import com.studymate.meeting.application.dto.response.MeetingPageResponse;
