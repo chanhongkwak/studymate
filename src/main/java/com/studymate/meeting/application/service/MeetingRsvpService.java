@@ -90,11 +90,6 @@ public class MeetingRsvpService {
             throw new ForbiddenException("현재 스터디 참여자만 참석 응답이 가능합니다.");
         }
 
-        if (study.getLeaderMemberId().equals(memberId)
-                && request.status() == MeetingRsvpStatus.NOT_ATTENDING) {
-            throw new ForbiddenException("그룹장은 불참을 선택할 수 없습니다.");
-        }
-
         if (meetingRsvpRepository
                 .findByMeetingIdAndMemberId(meetingId, memberId)
                 .isPresent()) {
@@ -166,17 +161,8 @@ public class MeetingRsvpService {
         MeetingRsvp meetingRsvp = meetingRsvpRepository.findByMeetingIdAndMemberId(meetingId, memberId)
                 .orElseThrow(() -> new NotFoundException("해당 모임 참석 여부를 확인 할 수 없습니다."));
 
-        MeetingRsvpStatus nextStatus = request.status() == null
-                ? meetingRsvp.getStatus()
-                : request.status();
-
-        if (study.getLeaderMemberId().equals(memberId)
-                && nextStatus == MeetingRsvpStatus.NOT_ATTENDING) {
-            throw new ForbiddenException("그룹장은 불참을 선택할 수 없습니다.");
-        }
-
         meetingRsvp.update(
-                nextStatus,
+                request.status(),
                 request.reason(),
                 memberId
         );
@@ -244,14 +230,14 @@ public class MeetingRsvpService {
             UUID studyId,
             UUID meetingId,
             UUID memberId
-    ){
-        if(studyId == null){
+    ) {
+        if (studyId == null) {
             throw new IllegalArgumentException("스터디ID는 필수입니다.");
         }
-        if(meetingId == null){
+        if (meetingId == null) {
             throw new IllegalArgumentException("모임ID는 필수입니다.");
         }
-        if(memberId == null){
+        if (memberId == null) {
             throw new IllegalArgumentException("회원ID는 필수입니다.");
         }
 
@@ -291,7 +277,7 @@ public class MeetingRsvpService {
 
         StudyMemberStatus participantStatus =
                 study.getStatus() == StudyStatus.ENDED
-                ? StudyMemberStatus.COMPLETE
+                        ? StudyMemberStatus.COMPLETE
                         : StudyMemberStatus.ACTIVE;
 
         List<StudyMember> participants =
@@ -304,7 +290,7 @@ public class MeetingRsvpService {
 
         Map<UUID, MeetingRsvp> rsvpByMemberId = new HashMap<>();
 
-        for(MeetingRsvp rsvp : rsvps){
+        for (MeetingRsvp rsvp : rsvps) {
             rsvpByMemberId.put(rsvp.getMemberId(), rsvp);
         }
 
