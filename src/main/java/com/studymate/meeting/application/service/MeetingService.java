@@ -292,10 +292,7 @@ public class MeetingService {
                         || !previousLocation.equals(meeting.getLocation());
 
         if (scheduleChanged) {
-            meetingRsvpRepository.deleteByMeetingIdAndMemberIdNot(
-                    meetingId,
-                    study.getLeaderMemberId()
-            );
+            meetingRsvpRepository.deleteByMeetingId(meetingId);
         }
 
         return MeetingResponse.from(meeting);

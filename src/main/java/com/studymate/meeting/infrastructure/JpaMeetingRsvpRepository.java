@@ -9,14 +9,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface JpaMeetingRsvpRepository extends JpaRepository<MeetingRsvp, UUID> {
     Optional<MeetingRsvp> findByMeetingIdAndMemberId(UUID meetingId, UUID memberId);
 
-    void deleteByMeetingIdAndMemberIdNot(
-            UUID meetingId,
-            UUID memberId
-    );
-
     List<MeetingRsvp> findAllByMeetingId(UUID meetingId);
 
+    void deleteByMeetingId(
+            UUID meetingId
+    );
+
     void deleteByMeetingIdAndMemberId(
-            UUID meetingId, UUID memberId
+            UUID meetingId,
+            UUID memberId
     );
 }
