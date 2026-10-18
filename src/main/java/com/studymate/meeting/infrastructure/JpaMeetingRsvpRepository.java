@@ -19,8 +19,4 @@ public interface JpaMeetingRsvpRepository extends JpaRepository<MeetingRsvp, UUI
             UUID meetingId,
             UUID memberId
     );
-
-    void deleteByMeetingId(
-            UUID meetingId
-    );
 }

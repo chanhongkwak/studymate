@@ -10,6 +10,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -20,6 +22,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "meeting")
 public class Meeting {
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalTime OPEN_TIME = LocalTime.of(9, 0);
+    private static final LocalTime CLOSE_TIME = LocalTime.of(18, 0);
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -34,9 +39,11 @@ public class Meeting {
     @Column(nullable = true, length = 5000)
     private String description;
 
+    //예약,모임 시작 시간, 한국 시간 기준
     @Column(nullable = false)
     private LocalDateTime startAt;
 
+    //예약 종료 시각, 마지막 10분의 정리,청소 시간을 포함
     @Column(nullable = false)
     private LocalDateTime endAt;
 
@@ -74,21 +81,9 @@ public class Meeting {
         if (description != null && description.length() > 5000) {
             throw new IllegalArgumentException("설명은 최대 5000자까지 가능합니다.");
         }
-        if (startAt == null) {
-            throw new IllegalArgumentException("시작시간은 필수입니다.");
-        }
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
+        validateSchedule(startAt, endAt, now);
 
-        LocalDateTime now = LocalDateTime.now();
-
-        if (!startAt.isAfter(now)) {
-            throw new IllegalArgumentException("시작 시간은 현재 시간보다 지나야 가능합니다.");
-        }
-        if (endAt == null) {
-            throw new IllegalArgumentException("종료시간은 필수입니다.");
-        }
-        if (!endAt.isAfter(startAt)) {
-            throw new IllegalArgumentException("종료 시각은 시작 시각보다 이후여야 합니다.");
-        }
         if (location == null || location.isBlank()) {
             throw new IllegalArgumentException("지역은 필수입니다.");
         }
@@ -122,7 +117,7 @@ public class Meeting {
             throw new IllegalArgumentException("설명은 최대 5000자까지 가능합니다.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         if (!this.startAt.isAfter(now)) {
             throw new ConflictException("이미 시작한 모임은 수정할 수 없습니다.");
@@ -163,12 +158,8 @@ public class Meeting {
         if (nextLocation.length() > 255) {
             throw new IllegalArgumentException("장소는 최대 255자까지 가능합니다.");
         }
-        if (!nextStartAt.isAfter(now)) {
-            throw new IllegalArgumentException("시작 시각은 현재 시각보다 이후여야 합니다.");
-        }
-        if (!nextEndAt.isAfter(nextStartAt)) {
-            throw new IllegalArgumentException("종료 시각은 시작 시각보다 이후여야 합니다.");
-        }
+
+        validateSchedule(nextStartAt, nextEndAt, now);
 
         this.title = nextTitle;
         this.description = nextDescription;
@@ -181,7 +172,7 @@ public class Meeting {
     }
 
     public void cancel(UUID canceledBy) {
-        cancel(canceledBy, LocalDateTime.now());
+        cancel(canceledBy, LocalDateTime.now(KOREA_ZONE));
     }
 
     public void cancel(UUID canceledBy, LocalDateTime canceledAt) {
@@ -207,5 +198,68 @@ public class Meeting {
         this.status = MeetingStatus.CANCELED;
         this.updatedAt = canceledAt;
         this.updatedBy = canceledBy;
+    }
+
+    private static void validateSchedule(
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            LocalDateTime now
+    ) {
+        if (startAt == null) {
+            throw new IllegalArgumentException("시작 시각은 필수입니다.");
+        }
+        if (endAt == null) {
+            throw new IllegalArgumentException("종료 시각은 필수입니다.");
+        }
+
+        if (!startAt.isAfter(now)) {
+            throw new IllegalArgumentException(
+                    "시작 시각은 현재 시각보다 이후여야 합니다."
+            );
+        }
+        if (!endAt.isAfter(startAt)) {
+            throw new IllegalArgumentException(
+                    "종료 시각은 시작 시각보다 이후여야 합니다."
+            );
+        }
+
+        if (!startAt.toLocalDate().equals(endAt.toLocalDate())) {
+            throw new IllegalArgumentException(
+                    "예약 시작과 종료는 같은 날짜여야 합니다."
+            );
+        }
+
+        if (startAt.toLocalTime().isBefore(OPEN_TIME)
+                || endAt.toLocalTime().isAfter(CLOSE_TIME)) {
+            throw new IllegalArgumentException(
+                    "예약은 한국 시간 09:00부터 18:00 사이에 시작하고 종료해야 합니다."
+            );
+        }
+
+        if (!isOnTheHour(startAt)) {
+            throw new IllegalArgumentException(
+                    "예약 시작 시각은 정각이어야 합니다."
+            );
+        }
+
+        if (!isOnTheHour(endAt)) {
+            throw new IllegalArgumentException(
+                    "예약은 1시간 단위여야 합니다."
+            );
+        }
+    }
+
+    private static boolean isOnTheHour(LocalDateTime dateTime) {
+        return dateTime.getMinute() == 0
+                && dateTime.getSecond() == 0
+                && dateTime.getNano() == 0;
+    }
+
+    public LocalDateTime calculateSessionEndAt() {
+        return this.endAt.minusMinutes(10);
+    }
+
+    public LocalDateTime calculateNormalCheckoutStartAt() {
+        return this.endAt.minusMinutes(20);
     }
 }
