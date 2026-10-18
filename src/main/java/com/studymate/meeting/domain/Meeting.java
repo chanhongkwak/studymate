@@ -106,7 +106,7 @@ public class Meeting {
         this.endAt = endAt;
         this.location = location;
 
-        this.status = MeetingStatus.SCHEDULED;
+        this.status = MeetingStatus.PROPOSED;
         this.createdAt = now;
         this.updatedAt = now;
         this.createdBy = createdBy;
@@ -139,6 +139,17 @@ public class Meeting {
         String nextLocation = location == null ? this.location : location;
         LocalDateTime nextStartAt = startAt == null ? this.startAt : startAt;
         LocalDateTime nextEndAt = endAt == null ? this.endAt : endAt;
+
+        boolean scheduleChanged =
+                !this.startAt.equals(nextStartAt)
+                        || !this.endAt.equals(nextEndAt)
+                        || !this.location.equals(nextLocation);
+
+        if (this.status == MeetingStatus.CONFIRMED && scheduleChanged) {
+            throw new ConflictException(
+                    "예약이 확정된 모임의 시간과 장소는 직접 변경할 수 없습니다."
+            );
+        }
 
         if (nextTitle.length() > 100) {
             throw new IllegalArgumentException("제목은 최대 100자까지 가능합니다.");
@@ -185,6 +196,12 @@ public class Meeting {
         }
         if (!this.startAt.isAfter(canceledAt)) {
             throw new ConflictException("이미 시작된 일정입니다.");
+        }
+
+        if (this.status == MeetingStatus.CONFIRMED) {
+            throw new ConflictException(
+                    "예약이 확정된 모임은 예약 취소 절차를 통해 취소해야 합니다."
+            );
         }
 
         this.status = MeetingStatus.CANCELED;

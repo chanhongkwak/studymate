@@ -68,4 +68,10 @@ public class MeetingRepositoryImpl implements MeetingRepository {
                 studyId, status, startAt
         );
     }
+
+    @Override
+    public List<Meeting> findAllByStudyIdAndStatusInAndStartAtAfter(UUID studyId, List<MeetingStatus> statuses,
+                                                                    LocalDateTime startAt) {
+        return jpaMeetingRepository.findAllByStudyIdAndStatusInAndStartAtAfter(studyId, statuses, startAt);
+    }
 }

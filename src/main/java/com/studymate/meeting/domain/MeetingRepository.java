@@ -41,4 +41,10 @@ public interface MeetingRepository {
             MeetingStatus status,
             LocalDateTime startAt
     );
+
+    List<Meeting> findAllByStudyIdAndStatusInAndStartAtAfter(
+            UUID studyId,
+            List<MeetingStatus> statuses,
+            LocalDateTime startAt
+    );
 }
