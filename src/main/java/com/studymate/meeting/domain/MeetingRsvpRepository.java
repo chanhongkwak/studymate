@@ -9,14 +9,13 @@ public interface MeetingRsvpRepository {
 
     Optional<MeetingRsvp> findByMeetingIdAndMemberId(UUID meetingId, UUID memberId);
 
-    void deleteByMeetingIdAndMemberIdNot(
-            UUID meetingId,
-            UUID memberId
-    );
-
     List<MeetingRsvp> findAllByMeetingId(UUID meetingId);
 
     void deleteByMeetingIdAndMemberId(
             UUID meetingId, UUID memberId
+    );
+
+    void deleteByMeetingId(
+            UUID meetingId
     );
 }

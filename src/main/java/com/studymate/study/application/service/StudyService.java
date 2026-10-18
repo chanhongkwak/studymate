@@ -220,6 +220,21 @@ public class StudyService {
             return StudyResponse.from(study);
         }
 
+        if (request.status() == StudyStatus.ENDED) {
+            List<Meeting> confirmedMeetings =
+                    meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
+                            studyId,
+                            MeetingStatus.CONFIRMED,
+                            LocalDateTime.now()
+                    );
+
+            if (!confirmedMeetings.isEmpty()) {
+                throw new ConflictException(
+                        "예약이 확정된 미래 모임이 있어 예약 취소 처리 후 종료해야 합니다."
+                );
+            }
+        }
+
         study.changeStatus(request.status(), memberId);
 
         if (study.getStatus() == StudyStatus.ENDED) {
@@ -243,14 +258,14 @@ public class StudyService {
                 application.cancelByStudyEnd(memberId);
             }
 
-            List<Meeting> scheduledMeetings =
+            List<Meeting> proposedMeetings =
                     meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
                             studyId,
-                            MeetingStatus.SCHEDULED,
+                            MeetingStatus.PROPOSED,
                             endedAt
                     );
 
-            for (Meeting meeting : scheduledMeetings) {
+            for (Meeting meeting : proposedMeetings) {
                 meeting.cancel(memberId, endedAt);
             }
         }

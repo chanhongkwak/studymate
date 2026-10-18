@@ -56,4 +56,10 @@ public interface JpaMeetingRepository extends JpaRepository<Meeting, UUID> {
             MeetingStatus status,
             LocalDateTime startAt
     );
+
+    List<Meeting> findAllByStudyIdAndStatusInAndStartAtAfter(
+            UUID studyId,
+            List<MeetingStatus> statuses,
+            LocalDateTime startAt
+    );
 }

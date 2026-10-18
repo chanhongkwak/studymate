@@ -251,14 +251,17 @@ public class StudyMemberService {
 
         LocalDateTime leftAt = LocalDateTime.now();
 
-        List<Meeting> scheduledMeetings =
-                meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
+        List<Meeting> upcomingMeetings =
+                meetingRepository.findAllByStudyIdAndStatusInAndStartAtAfter(
                         studyId,
-                        MeetingStatus.SCHEDULED,
+                        List.of(
+                                MeetingStatus.PROPOSED,
+                                MeetingStatus.CONFIRMED
+                        ),
                         leftAt
                 );
 
-        for (Meeting meeting : scheduledMeetings) {
+        for (Meeting meeting : upcomingMeetings) {
             meetingRsvpRepository.deleteByMeetingIdAndMemberId(
                     meeting.getId(),
                     memberId
