@@ -21,6 +21,7 @@ import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,8 @@ public class MeetingService {
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRsvpRepository meetingRsvpRepository;
+
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     @Transactional
     public MeetingResponse create(UUID studyId, UUID memberId, MeetingCreateRequest request) {
@@ -132,7 +135,7 @@ public class MeetingService {
             throw new NotFoundException("해당 스터디의 모임을 찾을 수 없습니다.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         boolean activeParticipant =
                 study.getStatus() != StudyStatus.ENDED
@@ -215,7 +218,7 @@ public class MeetingService {
             meetings = meetingRepository.findAllByStudyId(studyId, pageable);
         } else {
             meetings = meetingRepository.findAllByStudyIdAndEndAtLessThanEqual(
-                    studyId, LocalDateTime.now(), pageable
+                    studyId, LocalDateTime.now(KOREA_ZONE), pageable
             );
         }
 

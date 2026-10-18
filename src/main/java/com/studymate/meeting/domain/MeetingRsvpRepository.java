@@ -19,8 +19,4 @@ public interface MeetingRsvpRepository {
             UUID meetingId,
             UUID memberId
     );
-
-    void deleteByMeetingId(
-            UUID meetingId
-    );
 }

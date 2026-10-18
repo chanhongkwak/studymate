@@ -23,6 +23,7 @@ import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,8 @@ public class MeetingRsvpService {
     private final MeetingRepository meetingRepository;
     private final MemberRepository memberRepository;
     private final StudyMemberRepository studyMemberRepository;
+
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     @Transactional
     public MeetingRsvpResponse create(UUID studyId, UUID meetingId, UUID memberId, MeetingRsvpCreateRequest request) {
@@ -76,7 +79,7 @@ public class MeetingRsvpService {
             throw new ConflictException("취소된 모임에는 참석 응답을 할 수 없습니다.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         if (!meeting.getStartAt().isAfter(now)) {
             throw new ConflictException("이미 시작한 모임에는 참석 응답을 할 수 없습니다.");
@@ -144,7 +147,7 @@ public class MeetingRsvpService {
             throw new ConflictException("취소된 모임에는 참석 응답을 할 수 없습니다.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         if (!meeting.getStartAt().isAfter(now)) {
             throw new ConflictException("이미 시작한 모임에는 참석 응답을 할 수 없습니다.");
@@ -207,7 +210,7 @@ public class MeetingRsvpService {
                 .findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(studyId, memberId)
                 .orElseThrow(() -> new NotFoundException("해당 스터디회원을 찾을 수 없습니다."));
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         boolean activeParticipant = study.getStatus() != StudyStatus.ENDED
                 && studyMember.getStatus() == StudyMemberStatus.ACTIVE;
@@ -262,7 +265,7 @@ public class MeetingRsvpService {
                 .findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(studyId, memberId)
                 .orElseThrow(() -> new NotFoundException("해당 스터디회원을 찾을 수 없습니다."));
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         boolean activeParticipant = study.getStatus() != StudyStatus.ENDED
                 && studyMember.getStatus() == StudyMemberStatus.ACTIVE;

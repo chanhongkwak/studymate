@@ -29,11 +29,6 @@ public class MeetingRsvpRepositoryImpl implements MeetingRsvpRepository {
     }
 
     @Override
-    public void deleteByMeetingId(UUID meetingId) {
-        jpaMeetingRsvpRepository.deleteByMeetingId(meetingId);
-    }
-
-    @Override
     public void deleteByMeetingIdAndMemberId(UUID meetingId, UUID memberId) {
         jpaMeetingRsvpRepository.deleteByMeetingIdAndMemberId(meetingId, memberId);
     }

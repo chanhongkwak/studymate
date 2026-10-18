@@ -21,6 +21,7 @@ import com.studymate.study.domain.StudyMemberStatus;
 import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,8 @@ public class StudyService {
     private final MemberRepository memberRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRepository meetingRepository;
+
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     @Transactional
     public StudyResponse create(UUID memberId, StudyCreateRequest request) {
@@ -225,7 +228,7 @@ public class StudyService {
                     meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
                             studyId,
                             MeetingStatus.CONFIRMED,
-                            LocalDateTime.now()
+                            LocalDateTime.now(KOREA_ZONE)
                     );
 
             if (!confirmedMeetings.isEmpty()) {
@@ -238,7 +241,7 @@ public class StudyService {
         study.changeStatus(request.status(), memberId);
 
         if (study.getStatus() == StudyStatus.ENDED) {
-            LocalDateTime endedAt = LocalDateTime.now();
+            LocalDateTime endedAt = LocalDateTime.now(KOREA_ZONE);
 
             List<StudyMember> activeMembers =
                     studyMemberRepository.findAllByStudyIdAndStatus(
