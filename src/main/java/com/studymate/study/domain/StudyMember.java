@@ -38,10 +38,10 @@ public class StudyMember {
     @Column(length = 255)
     private String applicationMessage;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private UUID createdBy;
 
     @Column(nullable = false)
