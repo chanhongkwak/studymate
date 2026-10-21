@@ -1,4 +1,4 @@
-package com.studymate.reservation.domain;
+package com.studymate.reservation.domain.branch;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -1,4 +1,4 @@
-package com.studymate.reservation.domain;
+package com.studymate.reservation.domain.branch;
 
 import java.util.Optional;
 import java.util.UUID;
