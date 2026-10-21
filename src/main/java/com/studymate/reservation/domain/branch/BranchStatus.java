@@ -1,4 +1,4 @@
-package com.studymate.reservation.domain;
+package com.studymate.reservation.domain.branch;
 
 public enum BranchStatus {
     ACTIVE,

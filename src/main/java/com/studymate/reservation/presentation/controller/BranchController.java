@@ -1,4 +1,4 @@
-package com.studymate.reservation.presentation;
+package com.studymate.reservation.presentation.controller;
 
 import com.studymate.auth.infrastructure.MemberPrincipal;
 import com.studymate.reservation.application.dto.request.BranchRequest;
@@ -6,7 +6,7 @@ import com.studymate.reservation.application.dto.request.BranchStatusUpdateReque
 import com.studymate.reservation.application.dto.response.BranchPageResponse;
 import com.studymate.reservation.application.dto.response.BranchResponse;
 import com.studymate.reservation.application.service.BranchService;
-import com.studymate.reservation.domain.BranchStatus;
+import com.studymate.reservation.domain.branch.BranchStatus;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

@@ -1,7 +1,7 @@
-package com.studymate.reservation.infrastructure;
+package com.studymate.reservation.infrastructure.branch;
 
-import com.studymate.reservation.domain.Branch;
-import com.studymate.reservation.domain.BranchStatus;
+import com.studymate.reservation.domain.branch.Branch;
+import com.studymate.reservation.domain.branch.BranchStatus;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;

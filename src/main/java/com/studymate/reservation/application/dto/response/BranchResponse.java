@@ -1,7 +1,7 @@
 package com.studymate.reservation.application.dto.response;
 
-import com.studymate.reservation.domain.Branch;
-import com.studymate.reservation.domain.BranchStatus;
+import com.studymate.reservation.domain.branch.Branch;
+import com.studymate.reservation.domain.branch.BranchStatus;
 import java.util.UUID;
 
 public record BranchResponse(
