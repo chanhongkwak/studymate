@@ -14,6 +14,9 @@ import com.studymate.meeting.domain.MeetingRsvpStatus;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
+import com.studymate.reservation.domain.branch.Branch;
+import com.studymate.reservation.domain.branch.BranchRepository;
+import com.studymate.reservation.domain.branch.BranchStatus;
 import com.studymate.study.domain.Study;
 import com.studymate.study.domain.StudyMember;
 import com.studymate.study.domain.StudyMemberRepository;
@@ -40,6 +43,7 @@ public class MeetingService {
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRsvpRepository meetingRsvpRepository;
+    private final BranchRepository branchRepository;
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -71,13 +75,29 @@ public class MeetingService {
             throw new ForbiddenException("활성 회원만 일정 생성이 가능합니다.");
         }
 
+        if (request.branchId() == null) {
+            throw new IllegalArgumentException("지점 ID는 필수입니다.");
+        }
+
+        Branch branch = branchRepository.findById(request.branchId())
+                .orElseThrow(() -> new NotFoundException("해당 지점을 찾을 수 없습니다."));
+
+        if (branch.getStatus() != BranchStatus.ACTIVE) {
+            throw new ConflictException("운영 중인 지점에만 모임을 제안할 수 있습니다.");
+        }
+
+        if (request.maxCostPerPerson() == null) {
+            throw new IllegalArgumentException("1인당 최대 부담액은 필수입니다.");
+        }
+
         Meeting meeting = new Meeting(
                 studyId,
+                branch.getId(),
                 request.title(),
                 request.description(),
+                request.maxCostPerPerson(),
                 request.startAt(),
                 request.endAt(),
-                request.location(),
                 memberId
         );
 
@@ -267,16 +287,29 @@ public class MeetingService {
             throw new NotFoundException("해당 스터디의 모임을 찾을 수 없습니다.");
         }
 
+        if (request.branchId() != null
+                && !request.branchId().equals(meeting.getBranchId())) {
+
+            Branch branch = branchRepository.findById(request.branchId())
+                    .orElseThrow(() -> new NotFoundException("해당 지점을 찾을 수 없습니다."));
+
+            if (branch.getStatus() != BranchStatus.ACTIVE) {
+                throw new ConflictException("운영 중인 지점으로만 변경할 수 있습니다.");
+            }
+        }
+
+        UUID previousBranchId = meeting.getBranchId();
         LocalDateTime previousStartAt = meeting.getStartAt();
         LocalDateTime previousEndAt = meeting.getEndAt();
-        String previousLocation = meeting.getLocation();
+        long previousMaxCostPerPerson = meeting.getMaxCostPerPerson();
 
         meeting.update(
+                request.branchId(),
                 request.title(),
                 request.description(),
+                request.maxCostPerPerson(),
                 request.startAt(),
                 request.endAt(),
-                request.location(),
                 memberId
         );
 
@@ -289,12 +322,13 @@ public class MeetingService {
             throw new ConflictException("시간이 겹치는 모임이 존재합니다.");
         }
 
-        boolean scheduleChanged =
-                !previousStartAt.equals(meeting.getStartAt())
+        boolean reservationConditionsChanged =
+                !previousBranchId.equals(meeting.getBranchId())
+                        || !previousStartAt.equals(meeting.getStartAt())
                         || !previousEndAt.equals(meeting.getEndAt())
-                        || !previousLocation.equals(meeting.getLocation());
+                        || previousMaxCostPerPerson != meeting.getMaxCostPerPerson();
 
-        if (scheduleChanged) {
+        if (reservationConditionsChanged) {
             meetingRsvpRepository.deleteByMeetingId(meetingId);
         }
 
