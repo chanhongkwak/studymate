@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 public class Meeting {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalTime OPEN_TIME = LocalTime.of(9, 0);
-    private static final LocalTime CLOSE_TIME = LocalTime.of(18, 0);
+    private static final LocalTime CLOSE_TIME = LocalTime.of(23, 0);
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -33,11 +33,17 @@ public class Meeting {
     @Column(nullable = false)
     private UUID studyId;
 
+    @Column(nullable = false)
+    private UUID branchId;
+
     @Column(nullable = false, length = 100)
     private String title;
 
     @Column(nullable = true, length = 5000)
     private String description;
+
+    @Column(nullable = false)
+    private long maxCostPerPerson;
 
     //예약,모임 시작 시간, 한국 시간 기준
     @Column(nullable = false)
@@ -46,9 +52,6 @@ public class Meeting {
     //예약 종료 시각, 마지막 10분의 정리,청소 시간을 포함
     @Column(nullable = false)
     private LocalDateTime endAt;
-
-    @Column(nullable = false, length = 255)
-    private String location;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -67,10 +70,13 @@ public class Meeting {
     private UUID updatedBy;
 
 
-    public Meeting(UUID studyId, String title, String description, LocalDateTime startAt, LocalDateTime endAt,
-                   String location, UUID createdBy) {
+    public Meeting(UUID studyId, UUID branchId, String title, String description, long maxCostPerPerson,
+                   LocalDateTime startAt, LocalDateTime endAt, UUID createdBy) {
         if (studyId == null) {
             throw new IllegalArgumentException("스터디ID는 필수입니다.");
+        }
+        if (branchId == null) {
+            throw new IllegalArgumentException("지점ID는 필수입니다.");
         }
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("제목은 필수입니다.");
@@ -81,25 +87,23 @@ public class Meeting {
         if (description != null && description.length() > 5000) {
             throw new IllegalArgumentException("설명은 최대 5000자까지 가능합니다.");
         }
+        if (maxCostPerPerson < 1) {
+            throw new IllegalArgumentException("1인당 최대 부담액은 1포인트 이상이어야 합니다.");
+        }
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
         validateSchedule(startAt, endAt, now);
 
-        if (location == null || location.isBlank()) {
-            throw new IllegalArgumentException("지역은 필수입니다.");
-        }
-        if (location.length() > 255) {
-            throw new IllegalArgumentException("지역은 255자까지 가능합니다.");
-        }
         if (createdBy == null) {
             throw new IllegalArgumentException("생성자 ID는 필수입니다.");
         }
 
         this.studyId = studyId;
+        this.branchId = branchId;
         this.title = title;
         this.description = description;
+        this.maxCostPerPerson = maxCostPerPerson;
         this.startAt = startAt;
         this.endAt = endAt;
-        this.location = location;
 
         this.status = MeetingStatus.PROPOSED;
         this.createdAt = now;
@@ -109,10 +113,10 @@ public class Meeting {
     }
 
     public void update(
-            String title, String description, LocalDateTime startAt, LocalDateTime endAt,
-            String location, UUID updatedBy
+            UUID branchId, String title, String description, Long maxCostPerPerson, LocalDateTime startAt,
+            LocalDateTime endAt,
+            UUID updatedBy
     ) {
-
         if (description != null && description.length() > 5000) {
             throw new IllegalArgumentException("설명은 최대 5000자까지 가능합니다.");
         }
@@ -128,21 +132,28 @@ public class Meeting {
         if (this.status == MeetingStatus.CANCELED) {
             throw new ConflictException("취소된 모임은 수정할 수 없습니다.");
         }
-
+        UUID nextBranchId = branchId == null ? this.branchId : branchId;
         String nextTitle = title == null ? this.title : title;
         String nextDescription = description == null ? this.description : description;
-        String nextLocation = location == null ? this.location : location;
+        long nextMaxCostPerPerson = maxCostPerPerson == null ? this.maxCostPerPerson : maxCostPerPerson;
+
         LocalDateTime nextStartAt = startAt == null ? this.startAt : startAt;
         LocalDateTime nextEndAt = endAt == null ? this.endAt : endAt;
 
-        boolean scheduleChanged =
-                !this.startAt.equals(nextStartAt)
-                        || !this.endAt.equals(nextEndAt)
-                        || !this.location.equals(nextLocation);
+        if (nextMaxCostPerPerson < 1) {
+            throw new IllegalArgumentException("1인당 최대 부담액은 1포인트 이상이어야 합니다.");
+        }
 
-        if (this.status == MeetingStatus.CONFIRMED && scheduleChanged) {
+        boolean reservationConditionsChanged =
+                !this.branchId.equals(nextBranchId)
+                        || !this.startAt.equals(nextStartAt)
+                        || !this.endAt.equals(nextEndAt)
+                        || this.maxCostPerPerson != nextMaxCostPerPerson;
+
+        if (this.status == MeetingStatus.CONFIRMED
+                && reservationConditionsChanged) {
             throw new ConflictException(
-                    "예약이 확정된 모임의 시간과 장소는 직접 변경할 수 없습니다."
+                    "예약이 확정된 모임의 지점, 시간, 최대 부담액은 직접 변경할 수 없습니다."
             );
         }
 
@@ -152,18 +163,13 @@ public class Meeting {
         if (nextTitle.isBlank()) {
             throw new IllegalArgumentException("제목은 공백이 허용되지 않습니다.");
         }
-        if (nextLocation.isBlank()) {
-            throw new IllegalArgumentException("장소는 필수입니다.");
-        }
-        if (nextLocation.length() > 255) {
-            throw new IllegalArgumentException("장소는 최대 255자까지 가능합니다.");
-        }
 
         validateSchedule(nextStartAt, nextEndAt, now);
 
+        this.branchId = nextBranchId;
         this.title = nextTitle;
         this.description = nextDescription;
-        this.location = nextLocation;
+        this.maxCostPerPerson = nextMaxCostPerPerson;
         this.startAt = nextStartAt;
         this.endAt = nextEndAt;
         this.updatedBy = updatedBy;
@@ -232,7 +238,7 @@ public class Meeting {
         if (startAt.toLocalTime().isBefore(OPEN_TIME)
                 || endAt.toLocalTime().isAfter(CLOSE_TIME)) {
             throw new IllegalArgumentException(
-                    "예약은 한국 시간 09:00부터 18:00 사이에 시작하고 종료해야 합니다."
+                    "예약은 한국 시간 09:00부터 23:00 사이에 시작하고 종료해야 합니다."
             );
         }
 

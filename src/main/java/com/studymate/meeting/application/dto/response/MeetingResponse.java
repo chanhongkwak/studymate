@@ -11,17 +11,19 @@ public record MeetingResponse(
         String description,
         LocalDateTime startAt,
         LocalDateTime endAt,
-        String location,
+        UUID branchId,
+        long maxCostPerPerson,
         MeetingStatus status
 ) {
-    public static MeetingResponse from(Meeting meeting){
+    public static MeetingResponse from(Meeting meeting) {
         return new MeetingResponse(
                 meeting.getId(),
                 meeting.getTitle(),
                 meeting.getDescription(),
                 meeting.getStartAt(),
                 meeting.getEndAt(),
-                meeting.getLocation(),
+                meeting.getBranchId(),
+                meeting.getMaxCostPerPerson(),
                 meeting.getStatus()
         );
     }

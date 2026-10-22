@@ -8,6 +8,7 @@ public record MeetingCreateRequest(
         String description,
         LocalDateTime startAt,
         LocalDateTime endAt,
-        String location
+        UUID branchId,
+        Long maxCostPerPerson
 ) {
 }
