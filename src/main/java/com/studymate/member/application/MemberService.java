@@ -7,6 +7,8 @@ import com.studymate.member.application.dto.request.MemberUpdateRequest;
 import com.studymate.member.application.dto.response.MemberResponse;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
+import com.studymate.wallet.application.service.WalletService;
+import com.studymate.wallet.application.dto.request.WalletCreateRequest;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WalletService walletService;
 
     @Transactional
     public MemberResponse createMember(MemberCreateRequest memberCreateRequest) {
@@ -31,6 +34,11 @@ public class MemberService {
                 memberCreateRequest.nickname(), memberCreateRequest.activityRegion());
 
         Member savedMember = memberRepository.save(member);
+
+        walletService.create(
+                new WalletCreateRequest(savedMember.getId()),
+                savedMember.getId()
+        );
 
         return MemberResponse.from(savedMember);
     }
