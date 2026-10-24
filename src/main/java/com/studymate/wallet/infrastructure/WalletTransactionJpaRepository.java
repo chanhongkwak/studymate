@@ -1,0 +1,14 @@
+package com.studymate.wallet.infrastructure;
+
+import com.studymate.wallet.domain.WalletTransaction;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface WalletTransactionJpaRepository extends JpaRepository<WalletTransaction, UUID> {
+    Optional<WalletTransaction> findByIdempotencyKey(String idempotencyKey);
+
+    Page<WalletTransaction> findAllByWalletId(UUID walletId, Pageable pageable);
+}
