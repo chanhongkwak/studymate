@@ -11,4 +11,6 @@ public interface WalletRepository {
     Optional<Wallet> findByMemberId(UUID memberId);
 
     Optional<Wallet> findByIdForUpdate(UUID walletId);
+
+    Optional<UUID> findIdByMemberId(UUID memberId);
 }

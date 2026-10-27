@@ -68,10 +68,16 @@ public class WalletTransactionService {
             return WalletTransactionResponse.from(existing);
         }
 
-        if (request.walletTransactionType() == WalletTransactionType.RESERVATION_DEBIT) {
-            Member member = memberRepository
-                    .findByIdAndDeletedAtIsNull(wallet.getMemberId())
-                    .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+        if (request.walletTransactionType()
+                == WalletTransactionType.RESERVATION_DEBIT) {
+
+            Member member = memberRepository.findByIdForUpdate(wallet.getMemberId())
+                    .orElseThrow(() ->
+                            new NotFoundException("회원을 찾을 수 없습니다."));
+
+            if (member.getDeletedAt() != null) {
+                throw new NotFoundException("회원을 찾을 수 없습니다.");
+            }
 
             if (member.getStatus() != MemberStatus.ACTIVE) {
                 throw new ForbiddenException("활성 회원만 예약 비용을 차감할 수 있습니다.");

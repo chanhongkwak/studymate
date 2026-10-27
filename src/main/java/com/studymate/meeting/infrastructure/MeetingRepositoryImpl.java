@@ -74,4 +74,9 @@ public class MeetingRepositoryImpl implements MeetingRepository {
                                                                     LocalDateTime startAt) {
         return jpaMeetingRepository.findAllByStudyIdAndStatusInAndStartAtAfter(studyId, statuses, startAt);
     }
+
+    @Override
+    public Optional<UUID> findStudyIdById(UUID meetingId) {
+        return jpaMeetingRepository.findStudyIdById(meetingId);
+    }
 }

@@ -7,8 +7,8 @@ import com.studymate.member.application.dto.request.MemberUpdateRequest;
 import com.studymate.member.application.dto.response.MemberResponse;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
-import com.studymate.wallet.application.service.WalletService;
 import com.studymate.wallet.application.dto.request.WalletCreateRequest;
+import com.studymate.wallet.application.service.WalletService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -45,8 +45,13 @@ public class MemberService {
 
     @Transactional
     public MemberResponse updateMember(UUID memberId, MemberUpdateRequest memberUpdateRequest) {
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+        Member member = memberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() ->
+                        new NotFoundException("회원을 찾을 수 없습니다."));
+
+        if (member.getDeletedAt() != null) {
+            throw new NotFoundException("회원을 찾을 수 없습니다.");
+        }
 
         if (memberUpdateRequest.email() != null
                 && !memberUpdateRequest.email().equals(member.getEmail())
@@ -77,8 +82,18 @@ public class MemberService {
 
     @Transactional
     public void deleteMember(UUID memberId) {
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+        if (memberId == null) {
+            throw new IllegalArgumentException("회원ID는 필수입니다.");
+        }
+
+        Member member = memberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() ->
+                        new NotFoundException("회원을 찾을 수 없습니다."));
+
+        if (member.getDeletedAt() != null) {
+            throw new NotFoundException("회원을 찾을 수 없습니다.");
+        }
+
         member.delete(memberId);
     }
 }

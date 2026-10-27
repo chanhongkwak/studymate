@@ -17,4 +17,6 @@ public interface RoomRepository {
     Page<Room> findAllByBranchIdAndStatus(UUID branchId, RoomStatus roomStatus, Pageable pageable);
 
     Page<Room> findAllByBranchId(UUID branchId, Pageable pageable);
+
+    Optional<Room> findByIdForUpdate(UUID roomId);
 }

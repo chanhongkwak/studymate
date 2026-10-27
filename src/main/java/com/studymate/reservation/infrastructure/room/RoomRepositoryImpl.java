@@ -44,4 +44,9 @@ public class RoomRepositoryImpl implements RoomRepository {
     public Page<Room> findAllByBranchId(UUID branchId, Pageable pageable) {
         return roomJpaRepository.findAllByBranchId(branchId, pageable);
     }
+
+    @Override
+    public Optional<Room> findByIdForUpdate(UUID roomId) {
+        return roomJpaRepository.findByIdForUpdate(roomId);
+    }
 }

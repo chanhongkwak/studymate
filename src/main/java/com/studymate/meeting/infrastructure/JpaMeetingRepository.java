@@ -62,4 +62,7 @@ public interface JpaMeetingRepository extends JpaRepository<Meeting, UUID> {
             List<MeetingStatus> statuses,
             LocalDateTime startAt
     );
+
+    @Query("select m.studyId from Meeting m where m.id = :meetingId")
+    Optional<UUID> findStudyIdById(@Param("meetingId") UUID meetingId);
 }

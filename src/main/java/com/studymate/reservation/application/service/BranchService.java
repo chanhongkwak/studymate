@@ -72,8 +72,9 @@ public class BranchService {
             throw new IllegalArgumentException("지점ID는 필수입니다.");
         }
 
-        Branch branch = branchRepository.findById(branchId)
-                .orElseThrow(() -> new NotFoundException("해당 지점을 찾을 수 없습니다."));
+        Branch branch = branchRepository.findByIdForUpdate(branchId)
+                .orElseThrow(() ->
+                        new NotFoundException("해당 지점을 찾을 수 없습니다."));
 
         branch.update(
                 request.name(), request.address(), updatedBy
@@ -137,8 +138,9 @@ public class BranchService {
         if (branchId == null) {
             throw new IllegalArgumentException("지점ID는 필수입니다.");
         }
-        Branch branch = branchRepository.findById(branchId)
-                .orElseThrow(() -> new NotFoundException("해당 지점을 찾을 수 없습니다."));
+        Branch branch = branchRepository.findByIdForUpdate(branchId)
+                .orElseThrow(() ->
+                        new NotFoundException("해당 지점을 찾을 수 없습니다."));
         Member member = memberRepository.findByIdAndDeletedAtIsNull(updatedBy)
                 .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
         if (member.getStatus() != MemberStatus.ACTIVE) {
