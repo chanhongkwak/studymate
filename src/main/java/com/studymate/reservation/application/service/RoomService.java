@@ -94,8 +94,9 @@ public class RoomService {
         if (roomId == null) {
             throw new IllegalArgumentException("룸ID는 필수입니다.");
         }
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new NotFoundException("해당 룸을 찾을 수 없습니다."));
+        Room room = roomRepository.findByIdForUpdate(roomId)
+                .orElseThrow(() ->
+                        new NotFoundException("해당 방을 찾을 수 없습니다."));
 
         if (request.name() != null) {
             String normalizedName = request.name().strip();
@@ -138,8 +139,9 @@ public class RoomService {
         if (roomId == null) {
             throw new IllegalArgumentException("방ID는 필수입니다.");
         }
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new NotFoundException("해당 방을 찾을 수 없습니다."));
+        Room room = roomRepository.findByIdForUpdate(roomId)
+                .orElseThrow(() ->
+                        new NotFoundException("해당 방을 찾을 수 없습니다."));
 
         room.changeStatus(status, updatedBy);
 

@@ -2,6 +2,7 @@ package com.studymate.member.infrastructure;
 
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
+import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class MemberRepositoryImpl implements MemberRepository {
     private final JpaMemberRepository jpaMemberRepository;
+    private final EntityManager entityManager;
 
 
     @Override
@@ -37,4 +39,13 @@ public class MemberRepositoryImpl implements MemberRepository {
     public boolean existsByEmail(String email) {
         return jpaMemberRepository.existsByEmail(email);
     }
-}
+
+    @Override
+    public Optional<Member> findByIdForUpdate(UUID memberId) {
+        Optional<Member> result =
+                jpaMemberRepository.findByIdForUpdate(memberId);
+
+        result.ifPresent(member -> entityManager.refresh(member));
+
+        return result;
+    }}

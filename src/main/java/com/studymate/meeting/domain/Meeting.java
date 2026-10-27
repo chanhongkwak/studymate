@@ -177,6 +177,19 @@ public class Meeting {
         this.updatedAt = now;
     }
 
+    public void confirm(UUID confirmedBy) {
+        if (confirmedBy == null) {
+            throw new IllegalArgumentException("확정자ID는 필수입니다.");
+        }
+        if (this.status != MeetingStatus.PROPOSED) {
+            throw new ConflictException("제안 상태의 모임만 확정할 수 있습니다.");
+        }
+
+        this.status = MeetingStatus.CONFIRMED;
+        this.updatedAt = LocalDateTime.now(KOREA_ZONE);
+        this.updatedBy = confirmedBy;
+    }
+
     public void cancel(UUID canceledBy) {
         cancel(canceledBy, LocalDateTime.now(KOREA_ZONE));
     }

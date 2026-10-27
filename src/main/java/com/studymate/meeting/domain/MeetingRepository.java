@@ -47,4 +47,6 @@ public interface MeetingRepository {
             List<MeetingStatus> statuses,
             LocalDateTime startAt
     );
+
+    Optional<UUID> findStudyIdById(UUID meetingId);
 }

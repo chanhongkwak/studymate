@@ -16,4 +16,6 @@ public interface BranchRepository {
     );
 
     Page<Branch> findAll(Pageable pageable);
+
+    Optional<Branch> findByIdForUpdate(UUID branchId);
 }

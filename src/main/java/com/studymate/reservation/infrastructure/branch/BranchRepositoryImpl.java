@@ -35,4 +35,9 @@ public class BranchRepositoryImpl implements BranchRepository {
     public Page<Branch> findAll(Pageable pageable) {
         return branchJpaRepository.findAll(pageable);
     }
+
+    @Override
+    public Optional<Branch> findByIdForUpdate(UUID branchId) {
+        return branchJpaRepository.findByIdForUpdate(branchId);
+    }
 }

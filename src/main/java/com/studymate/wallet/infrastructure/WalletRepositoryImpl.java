@@ -31,4 +31,9 @@ public class WalletRepositoryImpl implements WalletRepository {
     public Optional<Wallet> findByIdForUpdate(UUID walletId) {
         return walletJpaRepository.findByIdForUpdate(walletId);
     }
+
+    @Override
+    public Optional<UUID> findIdByMemberId(UUID memberId) {
+        return walletJpaRepository.findIdByMemberId(memberId);
+    }
 }
