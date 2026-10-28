@@ -22,4 +22,9 @@ public interface ReservationRepository {
     void flush();
 
     Page<Reservation> findAllByStudyId(UUID studyId, Pageable pageable);
+
+    boolean existsFutureConfirmedReservation(
+            UUID studyId,
+            LocalDateTime now
+    );
 }

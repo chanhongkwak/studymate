@@ -219,6 +219,27 @@ public class Meeting {
         this.updatedBy = canceledBy;
     }
 
+    public void cancelByReservation(UUID canceledBy, LocalDateTime canceledAt) {
+        if (canceledBy == null) {
+            throw new IllegalArgumentException("취소자 ID는 필수입니다.");
+        }
+        if (canceledAt == null) {
+            throw new IllegalArgumentException("취소 시각은 필수입니다.");
+        }
+        if (this.status != MeetingStatus.CONFIRMED) {
+            throw new ConflictException(
+                    "예약이 확정된 모임만 예약 취소 절차로 취소할 수 있습니다."
+            );
+        }
+        if (!this.startAt.isAfter(canceledAt)) {
+            throw new ConflictException("이미 시작된 일정입니다.");
+        }
+
+        this.status = MeetingStatus.CANCELED;
+        this.updatedAt = canceledAt;
+        this.updatedBy = canceledBy;
+    }
+
     private static void validateSchedule(
             LocalDateTime startAt,
             LocalDateTime endAt,
