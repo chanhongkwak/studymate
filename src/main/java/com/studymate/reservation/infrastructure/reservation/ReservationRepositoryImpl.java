@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -22,6 +24,11 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     @Override
     public Optional<Reservation> findByMeetingId(UUID meetingId) {
         return reservationJpaRepository.findByMeetingId(meetingId);
+    }
+
+    @Override
+    public Optional<Reservation> findById(UUID reservationId) {
+        return reservationJpaRepository.findById(reservationId);
     }
 
     @Override
@@ -41,5 +48,10 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     @Override
     public void flush() {
         reservationJpaRepository.flush();
+    }
+
+    @Override
+    public Page<Reservation> findAllByStudyId(UUID studyId, Pageable pageable) {
+        return reservationJpaRepository.findAllByStudyId(studyId, pageable);
     }
 }

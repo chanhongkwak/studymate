@@ -1,6 +1,5 @@
-package com.studymate.reservation.domain;
+package com.studymate.reservation.domain.reservation;
 
-import com.studymate.reservation.domain.reservation.ReservationParticipant;
 import java.util.List;
 import java.util.UUID;
 

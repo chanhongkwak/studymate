@@ -44,3 +44,42 @@ runs without the opt-in environment variable skip this class.
 
 Reports: `build/reports/tests/test/index.html` and
 `build/test-results/test/TEST-com.studymate.reservation.ReservationPostgresIntegrationTest.xml`.
+
+## Reservation detail and list tests (2026-10-28)
+
+`ReservationReadPostgresIntegrationTest` uses a separate disposable database:
+`127.0.0.1:55438/reservation_read_test`. It never uses the development datasource.
+The opt-in variable is also `RESERVATION_PG_TEST=true`; without it the class is skipped.
+Each test rolls back its fixtures, and the Spring context uses `create-drop`.
+
+```powershell
+docker run --detach --name studymate-reservation-read-test -e POSTGRES_DB=reservation_read_test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55438:5432 postgres:16
+docker exec studymate-reservation-read-test pg_isready -U postgres -d reservation_read_test
+$env:JAVA_HOME='C:\Users\User\.jdks\ms-21.0.10'
+$env:RESERVATION_PG_TEST='true'
+try {
+    .\gradlew.bat test --tests com.studymate.reservation.ReservationReadPostgresIntegrationTest --rerun-tasks --console=plain
+} finally {
+    docker rm --force --volumes studymate-reservation-read-test
+    Remove-Item Env:RESERVATION_PG_TEST
+}
+```
+
+Use an unused container name and wait for `pg_isready` before running Gradle.
+Never substitute the development database URL. No separately running application
+server is needed. MockMvc uses the real web context, security filter chain,
+controller, service and PostgreSQL repositories. Authenticated tests inject a
+`MemberPrincipal` through Spring Security test support; JWT issuance and token
+signature verification are outside this suite's scope.
+
+Verified: **35 tests, 0 failures, 0 errors, 0 skipped**, PostgreSQL 16 and Java 21.
+Coverage includes non-participant study-member access, stored participants with
+zero amounts, canceled reservations and inactive facilities, outsider and
+membership-state denial, completed memberships in ended studies, latest
+membership history, deleted/missing resources, study isolation, start-time/UUID
+sorting, count queries, pagination, empty pages, and HTTP paths/defaults/response
+shape plus 400/401/403/404 responses. Fixtures use direct persistence to isolate
+read behavior; the reservation creation suite was not rerun for this change.
+
+XML report:
+`build/test-results/test/TEST-com.studymate.reservation.ReservationReadPostgresIntegrationTest.xml`.
