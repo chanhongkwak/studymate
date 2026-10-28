@@ -13,13 +13,15 @@ import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
 import com.studymate.reservation.application.dto.request.ReservationCreateRequest;
+import com.studymate.reservation.application.dto.response.ReservationPageResponse;
 import com.studymate.reservation.application.dto.response.ReservationResponse;
-import com.studymate.reservation.domain.ReservationParticipantRepository;
+import com.studymate.reservation.application.dto.response.ReservationSummaryResponse;
 import com.studymate.reservation.domain.branch.Branch;
 import com.studymate.reservation.domain.branch.BranchRepository;
 import com.studymate.reservation.domain.branch.BranchStatus;
 import com.studymate.reservation.domain.reservation.Reservation;
 import com.studymate.reservation.domain.reservation.ReservationParticipant;
+import com.studymate.reservation.domain.reservation.ReservationParticipantRepository;
 import com.studymate.reservation.domain.reservation.ReservationRepository;
 import com.studymate.reservation.domain.reservation.ReservationStatus;
 import com.studymate.reservation.domain.room.Room;
@@ -47,6 +49,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -358,5 +364,126 @@ public class ReservationService {
 
 // 예약 및 참석자별 부담액 반환
         return ReservationResponse.from(savedReservation, savedParticipants);
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationResponse getReservation(
+            UUID studyId,
+            UUID reservationId,
+            UUID memberId
+    ) {
+        if (studyId == null) {
+            throw new IllegalArgumentException("스터디ID는 필수입니다.");
+        }
+        if (reservationId == null) {
+            throw new IllegalArgumentException("예약ID는 필수입니다.");
+        }
+        if (memberId == null) {
+            throw new IllegalArgumentException("회원ID는 필수입니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원만 예약을 조회할 수 있습니다.");
+        }
+
+        Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
+                .orElseThrow(() -> new NotFoundException("스터디를 찾을 수 없습니다."));
+
+        StudyMember studyMember = studyMemberRepository
+                .findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(
+                        studyId,
+                        memberId
+                )
+                .orElseThrow(() -> new ForbiddenException("해당 스터디의 예약을 조회할 권한이 없습니다."));
+        boolean isActiveStudyMember = studyMember.getStatus() == StudyMemberStatus.ACTIVE;
+
+        boolean isCompletedStudyMember = study.getStatus() == StudyStatus.ENDED &&
+                studyMember.getStatus() == StudyMemberStatus.COMPLETE;
+
+        if (!isActiveStudyMember && !isCompletedStudyMember) {
+            throw new ForbiddenException("해당 스터디의 예약을 조회할 권한이 없습니다.");
+        }
+
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new NotFoundException("예약을 찾을 수 없습니다."));
+
+        Meeting meeting = meetingRepository.findById(reservation.getMeetingId())
+                .orElseThrow(() -> new NotFoundException("예약에 연결된 모임을 찾을 수 없습니다."));
+
+        if (!meeting.getStudyId().equals(studyId)) {
+            throw new NotFoundException("해당 스터디의 예약을 찾을 수 없습니다.");
+        }
+
+        List<ReservationParticipant> participants = reservationParticipantRepository
+                .findAllByReservationId(reservation.getId());
+
+        return ReservationResponse.from(reservation, participants);
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationPageResponse getReservations(
+            UUID studyId,
+            UUID memberId,
+            int page,
+            int size
+    ) {
+        if (studyId == null) {
+            throw new IllegalArgumentException("스터디ID는 필수입니다.");
+        }
+        if (memberId == null) {
+            throw new IllegalArgumentException("회원ID는 필수입니다.");
+        }
+        if (page < 0) {
+            throw new IllegalArgumentException("페이지 번호는 0 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException("페이지 크기는 1이상 100 이하여야합니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("해당 회원을 찾을 수 없습니다."));
+
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("활성 회원만 조회할 수 있습니다.");
+        }
+
+        Study study = studyRepository.findByIdAndDeletedAtIsNull(studyId)
+                .orElseThrow(() -> new NotFoundException("스터디를 찾을 수 없습니다."));
+
+        StudyMember studyMember = studyMemberRepository
+                .findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(
+                        studyId,
+                        memberId
+                )
+                .orElseThrow(() -> new ForbiddenException("해당 스터디의 예약을 조회할 권한이 없습니다."));
+
+        boolean isActiveStudyMember = studyMember.getStatus() == StudyMemberStatus.ACTIVE;
+
+        boolean isCompletedStudyMember = study.getStatus() == StudyStatus.ENDED
+                && studyMember.getStatus() == StudyMemberStatus.COMPLETE;
+
+        if (!isActiveStudyMember && !isCompletedStudyMember) {
+            throw new ForbiddenException("해당 스터디의 예약을 조회할 권한이 없습니다.");
+        }
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Order.desc("startAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+
+        Page<Reservation> reservations =
+                reservationRepository.findAllByStudyId(studyId, pageable);
+
+        Page<ReservationSummaryResponse> result =
+                reservations.map(ReservationSummaryResponse::from);
+
+        return ReservationPageResponse.from(result);
     }
 }

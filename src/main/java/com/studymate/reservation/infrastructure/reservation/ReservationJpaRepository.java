@@ -5,6 +5,8 @@ import com.studymate.reservation.domain.reservation.ReservationStatus;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,17 +17,42 @@ public interface ReservationJpaRepository extends JpaRepository<Reservation, UUI
     Optional<Reservation> findByMeetingId(UUID meetingId);
 
     @Query("""
-        select (count(r) > 0)
-        from Reservation r
-        where r.roomId = :roomId
-          and r.reservationStatus = :status
-          and r.startAt < :endAt
-          and r.endAt > :startAt
-        """)
+            select (count(r) > 0)
+            from Reservation r
+            where r.roomId = :roomId
+              and r.reservationStatus = :status
+              and r.startAt < :endAt
+              and r.endAt > :startAt
+            """)
     boolean existsOverlappingReservation(
             @Param("roomId") UUID roomId,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
             @Param("status") ReservationStatus status
+    );
+
+    @Query(
+            value = """
+                select r
+                from Reservation r
+                where r.meetingId in (
+                    select m.id
+                    from Meeting m
+                    where m.studyId = :studyId
+                )
+                """,
+            countQuery = """
+                select count(r)
+                from Reservation r
+                where r.meetingId in (
+                    select m.id
+                    from Meeting m
+                    where m.studyId = :studyId
+                )
+                """
+    )
+    Page<Reservation> findAllByStudyId(
+            @Param("studyId") UUID studyId,
+            Pageable pageable
     );
 }
