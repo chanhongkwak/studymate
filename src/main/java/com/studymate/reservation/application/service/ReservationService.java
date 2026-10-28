@@ -486,4 +486,162 @@ public class ReservationService {
 
         return ReservationPageResponse.from(result);
     }
+
+    @Transactional
+    public ReservationResponse cancel(
+            UUID studyId,
+            UUID reservationId,
+            UUID memberId
+    ){
+        if(studyId == null){
+            throw new IllegalArgumentException("스터디ID는 필수입니다.");
+        }
+        if(reservationId == null){
+            throw new IllegalArgumentException("예약ID는 필수입니다.");
+        }
+        if(memberId == null){
+            throw new IllegalArgumentException("회원ID는 필수입니다.");
+        }
+
+        Study study = studyRepository.findByIdForUpdate(studyId)
+                .orElseThrow(() -> new NotFoundException("스터디를 찾을 수 없습니다."));
+
+        if(study.getDeletedAt() != null){
+            throw new NotFoundException("스터디를 찾을 수 없습니다.");
+        }
+
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+                .orElseThrow(() -> new NotFoundException("회원을 찾을 수 없습니다."));
+
+        if(member.getStatus() != MemberStatus.ACTIVE){
+            throw new ForbiddenException("활성 회원만 예약을 취소할 수 있습니다.");
+        }
+
+        if(!study.getLeaderMemberId().equals(memberId)){
+            throw new ForbiddenException("현재 그룹장만 예약을 취소할 수 있습니다.");
+        }
+
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new NotFoundException("예약을 찾을 수 없습니다."));
+
+        Meeting meeting = meetingRepository.findById(reservation.getMeetingId())
+                .orElseThrow(() -> new NotFoundException("예약에 연결된 모임을 찾을 수 없습니다."));
+
+        if(!meeting.getStudyId().equals(studyId)){
+            throw new NotFoundException("해당 스터디의 예약을 찾을 수 없습니다.");
+        }
+
+        List<ReservationParticipant> participants =
+                reservationParticipantRepository.findAllByReservationId(
+                        reservation.getId()
+                );
+
+        // 이미 취소된 예약이면 추가 환불 없이 기존 결과 반환
+        if (reservation.getReservationStatus() == ReservationStatus.CANCELED) {
+            return ReservationResponse.from(reservation, participants);
+        }
+
+        if (reservation.getReservationStatus() != ReservationStatus.CONFIRMED) {
+            throw new ConflictException("확정된 예약만 취소할 수 있습니다.");
+        }
+
+        if (meeting.getStatus() != MeetingStatus.CONFIRMED) {
+            throw new ConflictException(
+                    "예약에 연결된 모임이 확정 상태가 아닙니다."
+            );
+        }
+
+        // 같은 방의 신규 예약 처리와 순서를 맞추기 위해 방 잠금 획득
+        roomRepository.findByIdForUpdate(reservation.getRoomId())
+                .orElseThrow(() ->
+                        new NotFoundException("예약에 연결된 방을 찾을 수 없습니다."));
+
+        // 예약 당시의 회원별 부담액
+        Map<UUID, Long> amountByMemberId = new LinkedHashMap<>();
+
+        for (ReservationParticipant participant : participants) {
+            amountByMemberId.put(
+                    participant.getMemberId(),
+                    participant.getAmount()
+            );
+        }
+
+        // 요청 그룹장이 예약 참석자가 아니어도 회원 잠금 대상에 포함
+        List<UUID> processingMemberIds =
+                new ArrayList<>(amountByMemberId.keySet());
+
+        if (!processingMemberIds.contains(memberId)) {
+            processingMemberIds.add(memberId);
+        }
+
+        // 예약 생성과 동일한 회원 ID 순서로 처리
+        processingMemberIds.sort(UUID::compareTo);
+
+        for (UUID processingMemberId : processingMemberIds) {
+            long amount = amountByMemberId.getOrDefault(
+                    processingMemberId,
+                    0L
+            );
+
+            // 실제 부담액이 있는 회원만 환불
+            if (amount > 0) {
+                UUID walletId = walletRepository
+                        .findIdByMemberId(processingMemberId)
+                        .orElseThrow(() ->
+                                new NotFoundException("환불받을 지갑을 찾을 수 없습니다."));
+
+                WalletTransactionRequest refundRequest =
+                        new WalletTransactionRequest(
+                                walletId,
+                                WalletTransactionType.RESERVATION_RETURN,
+                                amount,
+                                reservation.getId()
+                        );
+
+                // 내부에서 지갑 잠금, 원래 차감 내역과 중복 환불 검사
+                walletTransactionService.create(refundRequest, memberId);
+            }
+
+            // 요청 그룹장은 부담액 유무와 관계없이 잠금 후 활성 상태 재확인
+            if (processingMemberId.equals(memberId)) {
+                Member requester = memberRepository
+                        .findByIdForUpdate(memberId)
+                        .orElseThrow(() ->
+                                new NotFoundException("회원을 찾을 수 없습니다."));
+
+                if (requester.getDeletedAt() != null) {
+                    throw new NotFoundException("회원을 찾을 수 없습니다.");
+                }
+
+                if (requester.getStatus() != MemberStatus.ACTIVE) {
+                    throw new ForbiddenException(
+                            "활성 회원만 예약을 취소할 수 있습니다."
+                    );
+                }
+            }
+        }
+
+        // 1. 예약과 모임 상태를 취소로 변경
+        LocalDateTime canceledAt = LocalDateTime.now(KOREA_ZONE);
+
+        reservation.cancel(memberId);
+        meeting.cancelByReservation(memberId, canceledAt);
+
+// 2. 환불 및 상태 변경을 DB에 반영 — 아직 커밋은 아님
+        reservationRepository.flush();
+
+// 3. DB 반영 후 시각으로 최종 취소 가능 시간 검사
+        LocalDateTime checkedAt = LocalDateTime.now(KOREA_ZONE);
+        LocalDateTime deadline = reservation.getStartAt().minusHours(24);
+
+        if (checkedAt.isAfter(deadline)) {
+            throw new ConflictException(
+                    "예약은 모임 시작 최소 24시간 전까지 취소할 수 있습니다."
+            );
+        }
+
+// 4. 취소된 예약과 기존 참석자별 부담액 반환
+        return ReservationResponse.from(reservation, participants);
+    }
+
 }

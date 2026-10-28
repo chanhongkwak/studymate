@@ -54,4 +54,13 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     public Page<Reservation> findAllByStudyId(UUID studyId, Pageable pageable) {
         return reservationJpaRepository.findAllByStudyId(studyId, pageable);
     }
+
+    @Override
+    public boolean existsFutureConfirmedReservation(UUID studyId, LocalDateTime now) {
+        return reservationJpaRepository.existsFutureConfirmedReservation(
+                studyId,
+                ReservationStatus.CONFIRMED,
+                now
+        );
+    }
 }

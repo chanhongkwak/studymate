@@ -9,6 +9,7 @@ import com.studymate.meeting.domain.MeetingStatus;
 import com.studymate.member.domain.Member;
 import com.studymate.member.domain.MemberRepository;
 import com.studymate.member.domain.MemberStatus;
+import com.studymate.reservation.domain.reservation.ReservationRepository;
 import com.studymate.study.application.dto.request.StudyCreateRequest;
 import com.studymate.study.application.dto.request.StudyLeadershipTransferRequest;
 import com.studymate.study.application.dto.request.StudyStatusUpdatedRequest;
@@ -40,6 +41,7 @@ public class StudyService {
     private final MemberRepository memberRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRepository meetingRepository;
+    private final ReservationRepository reservationRepository;
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -186,6 +188,15 @@ public class StudyService {
             throw new ForbiddenException("스터디장만 삭제할 수 있습니다.");
         }
 
+        if (reservationRepository.existsFutureConfirmedReservation(
+                studyId,
+                LocalDateTime.now(KOREA_ZONE)
+        )) {
+            throw new ConflictException(
+                    "시작 전인 확정 예약이 있어 예약 취소 처리 후 삭제해야 합니다."
+            );
+        }
+
         study.delete(memberId);
     }
 
@@ -224,16 +235,12 @@ public class StudyService {
         }
 
         if (request.status() == StudyStatus.ENDED) {
-            List<Meeting> confirmedMeetings =
-                    meetingRepository.findAllByStudyIdAndStatusAndStartAtAfter(
-                            studyId,
-                            MeetingStatus.CONFIRMED,
-                            LocalDateTime.now(KOREA_ZONE)
-                    );
-
-            if (!confirmedMeetings.isEmpty()) {
+            if (reservationRepository.existsFutureConfirmedReservation(
+                    studyId,
+                    LocalDateTime.now(KOREA_ZONE)
+            )) {
                 throw new ConflictException(
-                        "예약이 확정된 미래 모임이 있어 예약 취소 처리 후 종료해야 합니다."
+                        "시작 전인 확정 예약이 있어 예약 취소 처리 후 종료해야 합니다."
                 );
             }
         }
