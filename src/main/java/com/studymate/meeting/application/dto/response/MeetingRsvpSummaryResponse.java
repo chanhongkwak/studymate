@@ -7,7 +7,7 @@ public record MeetingRsvpSummaryResponse(
         UUID meetingId,
         int attendingCount,
         int notAttendingCount,
-        int unansweredCount,
+        Integer unansweredCount,
         List<MeetingRsvpResponse> members
 ) {
 }

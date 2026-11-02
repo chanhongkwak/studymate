@@ -79,4 +79,30 @@ public class MeetingRepositoryImpl implements MeetingRepository {
     public Optional<UUID> findStudyIdById(UUID meetingId) {
         return jpaMeetingRepository.findStudyIdById(meetingId);
     }
+
+    @Override
+    public List<Meeting> findDueForResponseClosure(UUID studyId, LocalDateTime cutoff) {
+        return jpaMeetingRepository.findDueForResponseClosure(studyId, MeetingStatus.PROPOSED, cutoff);
+    }
+
+    @Override
+    public List<Meeting> findOpenForParticipantDeparture(UUID studyId, UUID studyMemberId, LocalDateTime cutoff) {
+        return jpaMeetingRepository.findOpenForParticipantDeparture(
+                studyId,
+                studyMemberId,
+                MeetingStatus.PROPOSED,
+                cutoff
+        );
+    }
+
+    @Override
+    public List<UUID> findStudiesWithDueMeetings(LocalDateTime now, LocalDateTime latestStart) {
+        return jpaMeetingRepository.findStudiesWithDueMeetings(MeetingStatus.PROPOSED, now, latestStart);
+    }
+
+    @Override
+    public List<Meeting> findExpiredProposals(UUID studyId, LocalDateTime latestStart) {
+        return jpaMeetingRepository.findAllByStudyIdAndStatusAndStartAtBefore(
+                studyId, MeetingStatus.PROPOSED, latestStart);
+    }
 }

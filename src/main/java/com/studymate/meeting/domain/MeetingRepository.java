@@ -49,4 +49,19 @@ public interface MeetingRepository {
     );
 
     Optional<UUID> findStudyIdById(UUID meetingId);
+
+    List<Meeting> findDueForResponseClosure(
+            UUID studyId,
+            LocalDateTime cutoff
+    );
+
+    List<Meeting> findOpenForParticipantDeparture(
+            UUID studyId,
+            UUID studyMemberId,
+            LocalDateTime cutoff
+    );
+
+    List<UUID> findStudiesWithDueMeetings(LocalDateTime now, LocalDateTime latestStart);
+
+    List<Meeting> findExpiredProposals(UUID studyId, LocalDateTime latestStart);
 }

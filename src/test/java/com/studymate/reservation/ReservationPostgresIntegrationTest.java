@@ -5,6 +5,12 @@ import com.studymate.global.exception.*;
 import com.studymate.member.domain.*;
 import com.studymate.member.application.MemberService;
 import com.studymate.meeting.domain.*;
+import com.studymate.meeting.application.service.MeetingService;
+import com.studymate.meeting.application.service.MeetingRsvpService;
+import com.studymate.meeting.application.dto.request.*;
+import com.studymate.study.application.service.StudyMemberService;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import com.studymate.reservation.application.dto.request.ReservationCreateRequest;
 import com.studymate.reservation.application.dto.response.ReservationResponse;
 import com.studymate.reservation.application.service.ReservationService;
@@ -32,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "RESERVATION_PG_TEST", matches = "true")
 @SpringBootTest(properties = {
     "spring.datasource.url=jdbc:postgresql://127.0.0.1:55437/reservation_test?ApplicationName=reservation-integration-test",
-    "spring.datasource.username=postgres", "spring.datasource.password=",
+    "studymate.meeting.deadlines.enabled=false",
+        "spring.datasource.username=postgres", "spring.datasource.password=",
     "spring.datasource.driver-class-name=org.postgresql.Driver",
     "spring.datasource.hikari.connection-init-sql=SET statement_timeout = '15s'",
     "spring.jpa.hibernate.ddl-auto=create-drop",
@@ -100,7 +107,219 @@ class ReservationPostgresIntegrationTest {
     UUID newMeeting(UUID study, LocalDateTime from, LocalDateTime to, long max) {
         Meeting meeting = new Meeting(study, branchId, "test meeting", "description", max, from, to, leader);
         em.persist(meeting);
+        for (StudyMember sm : em.createQuery("from StudyMember where studyId = :study", StudyMember.class)
+                .setParameter("study", study).getResultList()) {
+            em.persist(new MeetingParticipant(meeting.getId(), sm.getMemberId(), sm.getId(), leader));
+        }
+        meeting.closeResponse(meeting.getCreatedAt(), true, leader);
         return meeting.getId();
+    }
+    @Autowired com.studymate.meeting.application.service.MeetingDeadlineWorker deadlineWorker;
+
+    @Test void deadlineWorkerClosesPollThenExpiresUnreservedMeeting() {
+        tx(() -> {
+            em.createQuery("update Meeting set responseClosedAt=null, responseDeadlineAt=:past where id=:id")
+                    .setParameter("past", LocalDateTime.now(KOREA).minusMinutes(1))
+                    .setParameter("id", meetingId).executeUpdate();
+            return null;
+        });
+        deadlineWorker.process(studyId);
+        tx(() -> {
+            Meeting closed = em.find(Meeting.class, meetingId);
+            assertEquals(closed.getResponseDeadlineAt(), closed.getResponseClosedAt());
+            assertEquals(Boolean.TRUE, closed.getMajorityApproved());
+            em.createQuery("update Meeting set startAt=:soon where id=:id")
+                    .setParameter("soon", LocalDateTime.now(KOREA).plusHours(23))
+                    .setParameter("id", meetingId).executeUpdate();
+            return null;
+        });
+        deadlineWorker.process(studyId);
+        deadlineWorker.process(studyId);
+        tx(() -> {
+            assertEquals(MeetingStatus.CANCELED, em.find(Meeting.class, meetingId).getStatus());
+            assertEquals(0L, count("MeetingRsvp"));
+            return null;
+        });
+    }
+    @Autowired MeetingService meetings;
+    @Autowired MeetingRsvpService votes;
+    @Autowired StudyMemberService memberships;
+
+    UUID propose() {
+        return meetings.create(studyId, leader, new MeetingCreateRequest("new poll", null,
+                start.plusDays(1), start.plusDays(1).plusHours(2), branchId, 100L)).id();
+    }
+
+    void vote(UUID poll, int index, boolean yes) {
+        votes.create(studyId, poll, people.get(index), new MeetingRsvpCreateRequest(
+                yes ? MeetingRsvpStatus.ATTENDING : MeetingRsvpStatus.NOT_ATTENDING, yes ? null : "busy"));
+    }
+
+    @Test void originalRosterRejectsNewAndRejoinedMemberships() {
+        UUID poll = propose();
+        memberships.leave(studyId, people.get(4));
+        UUID newcomer = tx(() -> {
+            Member fresh = new Member(UUID.randomUUID()+"@example.com", "password", "tester", ActivityRegion.SEOUL_GANGNAM);
+            em.persist(fresh);
+            for (UUID id : List.of(fresh.getId(), people.get(4))) {
+                StudyMember membership = new StudyMember(studyId, id, null);
+                membership.approve(leader);
+                em.persist(membership);
+            }
+            return fresh.getId();
+        });
+        for (UUID id : List.of(newcomer, people.get(4))) {
+            assertThrows(ForbiddenException.class, () -> votes.create(studyId, poll, id,
+                    new MeetingRsvpCreateRequest(MeetingRsvpStatus.ATTENDING, null)));
+            assertThrows(ForbiddenException.class, () -> votes.update(studyId, poll, id,
+                    new MeetingRsvpUpdateRequest(MeetingRsvpStatus.ATTENDING, null)));
+        }
+        assertEquals(3, votes.getRsvpSummary(studyId, poll, leader).unansweredCount());
+    }
+
+    @Test void overduePollRejectsWritesBeforeWorkerAndCountsDepartureAfterDeadline() {
+        UUID poll = propose();
+        vote(poll, 1, true);
+        vote(poll, 2, true);
+        tx(() -> {
+            em.createQuery("update Meeting set responseDeadlineAt=:past where id=:id")
+                    .setParameter("past", LocalDateTime.now(KOREA).minusMinutes(1)).setParameter("id", poll).executeUpdate();
+            return null;
+        });
+        assertThrows(ConflictException.class, () -> vote(poll, 3, true));
+        assertThrows(ConflictException.class, () -> votes.update(studyId, poll, people.get(2),
+                new MeetingRsvpUpdateRequest(MeetingRsvpStatus.NOT_ATTENDING, "busy")));
+        memberships.leave(studyId, people.get(2));
+        var summary = votes.getRsvpSummary(studyId, poll, leader);
+        assertEquals(3, summary.attendingCount());
+        assertEquals(2, summary.unansweredCount());
+        var booked = reserve(poll, roomId);
+        assertStored(booked, 2, 100, 2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"time", "branch", "cost"})
+    void changingReservationConditionsRestartsClosedPoll(String change) {
+        UUID poll = propose();
+        for (int i = 1; i < 5; i++) vote(poll, i, true);
+        var closed = meetings.getMeeting(studyId, poll, leader);
+        assertEquals(true, closed.majorityApproved());
+        assertThrows(ConflictException.class, () -> votes.update(studyId, poll, leader,
+                new MeetingRsvpUpdateRequest(MeetingRsvpStatus.NOT_ATTENDING, "busy")));
+        UUID branch = change.equals("branch") ? tx(() -> {
+            Branch other = new Branch("other", "address", leader);
+            em.persist(other);
+            return other.getId();
+        }) : null;
+        LocalDateTime from = change.equals("time") ? start.plusDays(2) : null;
+        LocalDateTime before = LocalDateTime.now(KOREA);
+        var reset = meetings.update(studyId, poll, leader, new MeetingUpdateRequest(null, null,
+                from, from == null ? null : from.plusHours(2), branch, change.equals("cost") ? 50L : null));
+        assertNull(reset.majorityApproved());
+        assertNull(reset.responseClosedAt());
+        assertFalse(reset.responseDeadlineAt().isBefore(before.plusHours(24)));
+        assertFalse(reset.responseDeadlineAt().isAfter(LocalDateTime.now(KOREA).plusHours(24)));
+        assertEquals(5, votes.getRsvpSummary(studyId, poll, leader).unansweredCount());
+        assertThrows(ConflictException.class, () -> reserve(poll, roomId));
+        vote(poll, 1, true);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void lastVoteAndDepartureUseCommittedRoster(boolean voteFirst) throws Exception {
+        UUID poll = propose();
+        vote(poll, 1, true);
+        vote(poll, 2, false);
+        vote(poll, 3, false);
+        Runnable cast = () -> vote(poll, 4, true);
+        Runnable leave = () -> memberships.leave(studyId, people.get(1));
+        runWhileStudyLocked(voteFirst ? cast : leave, voteFirst ? leave : cast);
+        var closed = meetings.getMeeting(studyId, poll, leader);
+        assertNotNull(closed.responseClosedAt());
+        assertEquals(voteFirst, closed.majorityApproved());
+        assertEquals(voteFirst ? 3 : 2, votes.getRsvpSummary(studyId, poll, leader).attendingCount());
+    }
+
+    // Hold the first service transaction open until PostgreSQL observes the second waiting.
+    void runWhileStudyLocked(Runnable first, Runnable second) throws Exception {
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> waiter = tx(() -> {
+                first.run();
+                Future<?> future = pool.submit(second);
+                awaitDatabaseLockWait();
+                return future;
+            });
+            waiter.get(20, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS));
+        }
+    }
+
+    void processAfterCutoff() {
+        LocalDateTime late = start.minusHours(24).plusSeconds(1);
+        try (var clock = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+            clock.when(() -> LocalDateTime.now(KOREA)).thenReturn(late);
+            deadlineWorker.process(studyId);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void bookingAndExpirationCannotBothCommit(boolean bookingFirst) throws Exception {
+        Runnable bookAtCutoff = () -> atTime(start.minusHours(24));
+        if (bookingFirst) {
+            runWhileStudyLocked(bookAtCutoff, this::processAfterCutoff);
+            assertStored(reserve(), 3, 100, 3);
+        } else {
+            runWhileStudyLocked(this::processAfterCutoff, () -> assertThrows(ConflictException.class, bookAtCutoff::run));
+            tx(() -> {
+                assertEquals(MeetingCancellationReason.RESERVATION_NOT_CONFIRMED,
+                        em.find(Meeting.class, meetingId).getCancellationReason());
+                assertEquals(0L, count("Reservation"));
+                assertEquals(0L, count("WalletTransaction"));
+                assertEquals(0L, count("MeetingRsvp"));
+                return null;
+            });
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void remainingPayersMustStillPassCapAndBalanceChecks(boolean cap) {
+        memberships.leave(studyId, people.get(2));
+        tx(() -> {
+            if (cap) em.createQuery("update Meeting set maxCostPerPerson=49 where id=:id")
+                    .setParameter("id", meetingId).executeUpdate();
+            else em.find(Wallet.class, wallets.get(people.get(1))).debit(51, leader);
+            return null;
+        });
+        assertThrows(ConflictException.class, this::reserve);
+        tx(() -> {
+            assertEquals(Boolean.TRUE, em.find(Meeting.class, meetingId).getMajorityApproved());
+            assertEquals(0L, count("Reservation"));
+            assertEquals(0L, count("WalletTransaction"));
+            assertEquals(100, em.find(Wallet.class, wallets.get(leader)).getBalance());
+            return null;
+        });
+    }
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1})
+    void frozenApprovalWithZeroOrOneRemainingAttendee(int remaining) {
+        UUID poll = propose();
+        votes.update(studyId, poll, leader, new MeetingRsvpUpdateRequest(MeetingRsvpStatus.NOT_ATTENDING, "busy"));
+        for (int i = 1; i < 5; i++) vote(poll, i, true);
+        for (int i = 1; i <= 4 - remaining; i++) memberships.leave(studyId, people.get(i));
+        assertEquals(Boolean.TRUE, meetings.getMeeting(studyId, poll, leader).majorityApproved());
+        if (remaining == 1) {
+            var booked = reserve(poll, roomId);
+            assertStored(booked, 1, 100, 1);
+            assertEquals(people.get(4), booked.participants().get(0).memberId());
+        } else {
+            assertThrows(ConflictException.class, () -> reserve(poll, roomId));
+            unchanged();
+        }
     }
     void attend(UUID meeting, UUID person) {
         em.persist(new MeetingRsvp(meeting, person, MeetingRsvpStatus.ATTENDING, null, person));
@@ -145,7 +364,7 @@ class ReservationPostgresIntegrationTest {
     @AfterEach void clean() {
         // This context is hard-wired to reservation_test on 55437, never the development DB.
         tx(() -> {
-            for (String entity : List.of("WalletTransaction", "ReservationParticipant", "Reservation", "MeetingRsvp", "Meeting", "StudyMember", "Study", "Room", "Branch", "Wallet", "Member")) {
+            for (String entity : List.of("WalletTransaction", "ReservationParticipant", "Reservation", "MeetingParticipant", "MeetingRsvp", "Meeting", "StudyMember", "Study", "Room", "Branch", "Wallet", "Member")) {
                 em.createQuery("delete from " + entity).executeUpdate();
             }
             return null;
@@ -179,14 +398,14 @@ class ReservationPostgresIntegrationTest {
         assertThrows(ForbiddenException.class, () -> service.create(people.get(1), new ReservationCreateRequest(meetingId, roomId)));
         unchanged();
     }
-    @Test void exactlyHalfRejectedIncludingUnansweredMembersInDenominator() {
+    @Test void newMembershipAfterClosureDoesNotInvalidateMajority() {
         tx(() -> {
             Member sixth = new Member(UUID.randomUUID()+"@example.com", "test-password", "sixth", ActivityRegion.SEOUL_GANGNAM);
             em.persist(sixth);
             StudyMember sm = new StudyMember(studyId, sixth.getId(), null); sm.approve(leader); em.persist(sm);
             return null;
         });
-        assertThrows(ConflictException.class, this::reserve); unchanged();
+        assertStored(reserve(), 3, 100, 3);
     }
     @Test void capacityExceededRejected() {
         tx(() -> { em.find(Room.class, roomId).update(null, 2, null, leader); return null; });

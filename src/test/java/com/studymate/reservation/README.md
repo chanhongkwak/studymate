@@ -83,3 +83,49 @@ read behavior; the reservation creation suite was not rerun for this change.
 
 XML report:
 `build/test-results/test/TEST-com.studymate.reservation.ReservationReadPostgresIntegrationTest.xml`.
+
+## Cancellation and refund tests (2026-10-28)
+
+`ReservationCancelPostgresIntegrationTest` is opt-in via `RESERVATION_PG_TEST=true`
+and explicitly uses the disposable `127.0.0.1:55439/reservation_cancel_test`
+database with `create-drop`. Never replace this URL with a development database.
+Fixtures create real reservations through the creation service; initial wallet
+funding is test-only direct credit. Tests use real commits/rollbacks, and cleanup
+deletes fixtures only in this dedicated database.
+
+```powershell
+docker run --detach --name studymate-reservation-cancel-test -e POSTGRES_DB=reservation_cancel_test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55439:5432 postgres:16
+docker exec studymate-reservation-cancel-test pg_isready -U postgres -d reservation_cancel_test
+$env:JAVA_HOME='C:\Users\User\.jdks\ms-21.0.10'
+$env:RESERVATION_PG_TEST='true'
+try {
+    .\gradlew.bat test --tests com.studymate.reservation.ReservationCancelPostgresIntegrationTest --rerun-tasks --console=plain
+} finally {
+    docker rm --force --volumes studymate-reservation-cancel-test
+    Remove-Item Env:RESERVATION_PG_TEST
+}
+```
+
+Choose an unused container name, and wait for `pg_isready` before running Gradle.
+No separately running application server is required.
+
+Verified: **32 tests, 0 failures, 0 errors, 0 skipped**, PostgreSQL 16 / Java 21.
+Coverage includes exact per-member refunds, zero shares, absent/current/former
+leaders, deleted/departed recipients, inactive facilities, input/permission
+checks, repeated cancellation, read-history preservation, final 24-hour boundary
+at -1/0/+1 nanoseconds, deadline crossing after real flush, missing debit and
+database constraint failure rollback, study end/delete guards and release after
+cancellation, old meeting cancellation bypass prevention, and room-slot reuse.
+
+Concurrency tests observe real PostgreSQL lock waits: duplicate cancellations,
+leader deletion while waiting for a room (including a non-participant leader),
+and study termination waiting for cancellation. MockMvc covers successful PATCH,
+401/403, and deadline 409 with real service/repository behavior. Authentication
+is injected through Spring Security test support, so JWT issuance/signature
+validation is not covered. Java time checks use thread-local mocked time; SQL
+timestamp boundary checks use microsecond precision to match PostgreSQL.
+
+Only this cancellation suite was executed for this change; existing full
+creation/read suites were not rerun. No production code was changed by the test
+work. XML report:
+`build/test-results/test/TEST-com.studymate.reservation.ReservationCancelPostgresIntegrationTest.xml`.

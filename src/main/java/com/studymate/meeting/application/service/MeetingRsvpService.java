@@ -8,6 +8,8 @@ import com.studymate.meeting.application.dto.request.MeetingRsvpUpdateRequest;
 import com.studymate.meeting.application.dto.response.MeetingRsvpResponse;
 import com.studymate.meeting.application.dto.response.MeetingRsvpSummaryResponse;
 import com.studymate.meeting.domain.Meeting;
+import com.studymate.meeting.domain.MeetingParticipant;
+import com.studymate.meeting.domain.MeetingParticipantRepository;
 import com.studymate.meeting.domain.MeetingRepository;
 import com.studymate.meeting.domain.MeetingRsvp;
 import com.studymate.meeting.domain.MeetingRsvpRepository;
@@ -26,6 +28,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +45,8 @@ public class MeetingRsvpService {
     private final MeetingRepository meetingRepository;
     private final MemberRepository memberRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final MeetingParticipantRepository meetingParticipantRepository;
+    private final MeetingResponseService meetingResponseService;
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -75,14 +81,26 @@ public class MeetingRsvpService {
             throw new NotFoundException("해당 스터디의 모임을 찾을 수 없습니다.");
         }
 
-        if (meeting.getStatus() == MeetingStatus.CANCELED) {
-            throw new ConflictException("취소된 모임에는 참석 응답을 할 수 없습니다.");
+        if (meeting.getStatus() != MeetingStatus.PROPOSED) {
+            throw new ConflictException(
+                    "제안 상태의 모임에만 참석 응답을 할 수 있습니다."
+            );
+        }
+
+        if (meeting.getResponseClosedAt() != null) {
+            throw new ConflictException("이미 응답이 종료된 모임입니다.");
         }
 
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         if (!meeting.getStartAt().isAfter(now)) {
-            throw new ConflictException("이미 시작한 모임에는 참석 응답을 할 수 없습니다.");
+            throw new ConflictException(
+                    "이미 시작한 모임에는 참석 응답을 할 수 없습니다."
+            );
+        }
+
+        if (meeting.getResponseDeadlineAt() == null || !now.isBefore(meeting.getResponseDeadlineAt())) {
+            throw new ConflictException("응답 마감 시각이 지났습니다.");
         }
 
         StudyMember studyMember = studyMemberRepository.findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(
@@ -91,6 +109,17 @@ public class MeetingRsvpService {
 
         if (studyMember.getStatus() != StudyMemberStatus.ACTIVE) {
             throw new ForbiddenException("현재 스터디 참여자만 참석 응답이 가능합니다.");
+        }
+
+        MeetingParticipant participant = meetingParticipantRepository
+                .findByMeetingIdAndMemberId(meetingId, memberId)
+                .orElseThrow(() ->
+                        new ForbiddenException("해당 모임의 응답 대상자가 아닙니다."));
+
+        if (!participant.getStudyMemberId().equals(studyMember.getId())) {
+            throw new ForbiddenException(
+                    "재가입 이전에 제안된 모임에는 응답할 수 없습니다."
+            );
         }
 
         if (meetingRsvpRepository
@@ -108,6 +137,8 @@ public class MeetingRsvpService {
         );
 
         meetingRsvpRepository.save(meetingRsvp);
+
+        meetingResponseService.closeIfAllResponded(meeting, memberId);
 
         return MeetingRsvpResponse.from(meetingRsvp);
     }
@@ -143,14 +174,26 @@ public class MeetingRsvpService {
             throw new NotFoundException("해당 스터디의 모임을 찾을 수 없습니다.");
         }
 
-        if (meeting.getStatus() == MeetingStatus.CANCELED) {
-            throw new ConflictException("취소된 모임에는 참석 응답을 할 수 없습니다.");
+        if (meeting.getStatus() != MeetingStatus.PROPOSED) {
+            throw new ConflictException(
+                    "제안 상태의 모임에만 참석 응답을 할 수 있습니다."
+            );
+        }
+
+        if (meeting.getResponseClosedAt() != null) {
+            throw new ConflictException("이미 응답이 종료된 모임입니다.");
         }
 
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
 
         if (!meeting.getStartAt().isAfter(now)) {
-            throw new ConflictException("이미 시작한 모임에는 참석 응답을 할 수 없습니다.");
+            throw new ConflictException(
+                    "이미 시작한 모임에는 참석 응답을 할 수 없습니다."
+            );
+        }
+
+        if (meeting.getResponseDeadlineAt() == null || !now.isBefore(meeting.getResponseDeadlineAt())) {
+            throw new ConflictException("응답 마감 시각이 지났습니다.");
         }
 
         StudyMember studyMember = studyMemberRepository.findFirstByStudyIdAndMemberIdOrderByCreatedAtDescIdDesc(
@@ -161,6 +204,17 @@ public class MeetingRsvpService {
             throw new ForbiddenException("현재 스터디 참여자만 참석 응답이 가능합니다.");
         }
 
+        MeetingParticipant participant = meetingParticipantRepository
+                .findByMeetingIdAndMemberId(meetingId, memberId)
+                .orElseThrow(() ->
+                        new ForbiddenException("해당 모임의 응답 대상자가 아닙니다."));
+
+        if (!participant.getStudyMemberId().equals(studyMember.getId())) {
+            throw new ForbiddenException(
+                    "재가입 이전에 제안된 모임에는 응답할 수 없습니다."
+            );
+        }
+
         MeetingRsvp meetingRsvp = meetingRsvpRepository.findByMeetingIdAndMemberId(meetingId, memberId)
                 .orElseThrow(() -> new NotFoundException("해당 모임 참석 여부를 확인 할 수 없습니다."));
 
@@ -169,6 +223,8 @@ public class MeetingRsvpService {
                 request.reason(),
                 memberId
         );
+
+        meetingResponseService.closeIfAllResponded(meeting, memberId);
 
         return MeetingRsvpResponse.from(meetingRsvp);
     }
@@ -223,6 +279,10 @@ public class MeetingRsvpService {
             throw new ForbiddenException("참석 응답을 조회할 권한이 없습니다.");
         }
 
+        if (meetingParticipantRepository.findByMeetingIdAndMemberId(meetingId, memberId).isEmpty()
+                && meeting.getResponseDeadlineAt() != null) {
+            throw new ForbiddenException("해당 모임의 응답 대상자가 아닙니다.");
+        }
         return meetingRsvpRepository.findByMeetingIdAndMemberId(meetingId, memberId)
                 .map(MeetingRsvpResponse::from)
                 .orElseGet(() -> MeetingRsvpResponse.unanswered(meetingId, memberId));
@@ -278,19 +338,24 @@ public class MeetingRsvpService {
             throw new ForbiddenException("참석 응답을 조회할 권한이 없습니다.");
         }
 
-        StudyMemberStatus participantStatus =
-                study.getStatus() == StudyStatus.ENDED
-                        ? StudyMemberStatus.COMPLETE
-                        : StudyMemberStatus.ACTIVE;
-
-        List<StudyMember> participants =
-                studyMemberRepository.findAllByStudyIdAndStatus(
-                        studyId,
-                        participantStatus
-                );
+        List<MeetingParticipant> participants = meetingParticipantRepository.findAllByMeetingId(meetingId);
+        Set<UUID> activeMemberships = new HashSet<>();
+        if (meeting.getResponseClosedAt() == null) {
+            for (StudyMember membership : studyMemberRepository.findAllByStudyIdAndStatus(
+                    studyId, StudyMemberStatus.ACTIVE)) {
+                activeMemberships.add(membership.getId());
+            }
+        }
 
         List<MeetingRsvp> rsvps = meetingRsvpRepository.findAllByMeetingId(meetingId);
 
+        // Older meetings have recorded answers but no original voter roster.
+        if (meeting.getResponseDeadlineAt() == null && meeting.getCancellationReason() == null) {
+            int attending = (int) rsvps.stream()
+                    .filter(rsvp -> rsvp.getStatus() == MeetingRsvpStatus.ATTENDING).count();
+            return new MeetingRsvpSummaryResponse(meetingId, attending, rsvps.size() - attending,
+                    null, rsvps.stream().map(MeetingRsvpResponse::from).toList());
+        }
         Map<UUID, MeetingRsvp> rsvpByMemberId = new HashMap<>();
 
         for (MeetingRsvp rsvp : rsvps) {
@@ -303,7 +368,12 @@ public class MeetingRsvpService {
         int notAttendingCount = 0;
         int unansweredCount = 0;
 
-        for (StudyMember participant : participants) {
+        for (MeetingParticipant participant : participants) {
+            boolean eligible = meeting.getResponseClosedAt() == null
+                    ? activeMemberships.contains(participant.getStudyMemberId()) : !participant.isExcludedAtClosure();
+            if (!eligible || meeting.getCancellationReason() != null) {
+                continue;
+            }
             UUID participantMemberId = participant.getMemberId();
             MeetingRsvp rsvp = rsvpByMemberId.get(participantMemberId);
 

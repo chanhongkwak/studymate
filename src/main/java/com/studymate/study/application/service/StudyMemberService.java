@@ -3,6 +3,7 @@ package com.studymate.study.application.service;
 import com.studymate.global.exception.ConflictException;
 import com.studymate.global.exception.ForbiddenException;
 import com.studymate.global.exception.NotFoundException;
+import com.studymate.meeting.application.service.MeetingResponseService;
 import com.studymate.meeting.domain.Meeting;
 import com.studymate.meeting.domain.MeetingRepository;
 import com.studymate.meeting.domain.MeetingRsvpRepository;
@@ -20,6 +21,7 @@ import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class StudyMemberService {
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRepository meetingRepository;
     private final MeetingRsvpRepository meetingRsvpRepository;
+    private final MeetingResponseService meetingResponseService;
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -250,27 +253,35 @@ public class StudyMemberService {
                         memberId)
                 .orElseThrow(() -> new NotFoundException("해당 스터디의 참여 내역을 찾을 수 없습니다."));
 
+        LocalDateTime leaveDecisionAt = LocalDateTime.now(KOREA_ZONE)
+                .truncatedTo(ChronoUnit.MICROS);
+
+// 이미 마감된 투표는 탈퇴 전 인원으로 확정한다.
+        List<Meeting> dueMeetings =
+                meetingRepository.findDueForResponseClosure(studyId, leaveDecisionAt);
+
+        for (Meeting meeting : dueMeetings) {
+            meetingResponseService.closeIfDeadlineReached(meeting, memberId);
+        }
+
         studyMember.leave(memberId);
 
-        LocalDateTime leftAt = LocalDateTime.now(KOREA_ZONE);
-
-        List<Meeting> upcomingMeetings =
-                meetingRepository.findAllByStudyIdAndStatusInAndStartAtAfter(
+// 아직 열려 있던 투표는 탈퇴 후 남은 인원으로 판단한다.
+        List<Meeting> openMeetings =
+                meetingRepository.findOpenForParticipantDeparture(
                         studyId,
-                        List.of(
-                                MeetingStatus.PROPOSED,
-                                MeetingStatus.CONFIRMED
-                        ),
-                        leftAt
+                        studyMember.getId(),
+                        leaveDecisionAt
                 );
 
-        for (Meeting meeting : upcomingMeetings) {
-            meetingRsvpRepository.deleteByMeetingIdAndMemberId(
-                    meeting.getId(),
+        for (Meeting meeting : openMeetings) {
+            meetingResponseService.closeIfAllRespondedAfterLeave(
+                    meeting,
+                    leaveDecisionAt,
                     memberId
             );
         }
 
         return StudyMemberResponse.from(studyMember);
-    }
+     }
 }

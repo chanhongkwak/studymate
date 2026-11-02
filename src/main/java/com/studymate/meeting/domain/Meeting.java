@@ -57,6 +57,18 @@ public class Meeting {
     @Column(nullable = false, length = 30)
     private MeetingStatus status;
 
+    @Enumerated(EnumType.STRING)
+    private MeetingCancellationReason cancellationReason;
+
+    @Column
+    private LocalDateTime responseDeadlineAt; // 정책 도입 전 모임은 null
+
+    @Column
+    private LocalDateTime responseClosedAt;
+
+    @Column
+    private Boolean majorityApproved;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -110,6 +122,10 @@ public class Meeting {
         this.updatedAt = now;
         this.createdBy = createdBy;
         this.updatedBy = createdBy;
+
+        this.responseDeadlineAt = responseDeadline(now, startAt);
+        this.responseClosedAt = null;
+        this.majorityApproved = null;
     }
 
     public void update(
@@ -131,6 +147,9 @@ public class Meeting {
         }
         if (this.status == MeetingStatus.CANCELED) {
             throw new ConflictException("취소된 모임은 수정할 수 없습니다.");
+        }
+        if (status == MeetingStatus.PROPOSED && (responseDeadlineAt == null || now.isAfter(this.startAt.minusHours(24)))) {
+            throw new ConflictException("예약 기한이 지났거나 이전 정책으로 생성된 제안입니다.");
         }
         UUID nextBranchId = branchId == null ? this.branchId : branchId;
         String nextTitle = title == null ? this.title : title;
@@ -166,15 +185,73 @@ public class Meeting {
 
         validateSchedule(nextStartAt, nextEndAt, now);
 
+        LocalDateTime nextDeadline = reservationConditionsChanged
+                ? responseDeadline(now, nextStartAt) : this.responseDeadlineAt;
         this.branchId = nextBranchId;
         this.title = nextTitle;
         this.description = nextDescription;
         this.maxCostPerPerson = nextMaxCostPerPerson;
         this.startAt = nextStartAt;
         this.endAt = nextEndAt;
-        this.updatedBy = updatedBy;
 
+        if (reservationConditionsChanged) {
+            this.responseDeadlineAt = nextDeadline;
+            this.responseClosedAt = null;
+            this.majorityApproved = null;
+        }
+
+        this.updatedBy = updatedBy;
         this.updatedAt = now;
+    }
+
+    public void closeResponse(
+            LocalDateTime closedAt,
+            boolean majorityApproved,
+            UUID updatedBy
+    ) {
+        if (closedAt == null) {
+            throw new IllegalArgumentException("응답 종료 시각은 필수입니다.");
+        }
+
+        if (updatedBy == null) {
+            throw new IllegalArgumentException("수정자 ID는 필수입니다.");
+        }
+
+        if (this.status != MeetingStatus.PROPOSED) {
+            throw new ConflictException("제안 상태의 모임만 응답을 종료할 수 있습니다.");
+        }
+
+        if (this.responseClosedAt != null) {
+            throw new ConflictException("이미 응답이 종료된 모임입니다.");
+        }
+
+        LocalDateTime responseOpenedAt =
+                this.responseDeadlineAt.minusHours(24);
+
+        if (closedAt.isBefore(responseOpenedAt)) {
+            throw new IllegalArgumentException(
+                    "응답 종료 시각은 응답 시작 시각보다 빠를 수 없습니다."
+            );
+        }
+
+        if (closedAt.isAfter(this.responseDeadlineAt)) {
+            throw new IllegalArgumentException(
+                    "응답 종료 시각은 응답 마감 시각보다 늦을 수 없습니다."
+            );
+        }
+
+        LocalDateTime now = LocalDateTime.now(KOREA_ZONE);
+
+        if (closedAt.isAfter(now)) {
+            throw new IllegalArgumentException(
+                    "응답 종료 시각은 현재 시각보다 늦을 수 없습니다."
+            );
+        }
+
+        this.responseClosedAt = closedAt;
+        this.majorityApproved = majorityApproved;
+        this.updatedAt = now;
+        this.updatedBy = updatedBy;
     }
 
     public void confirm(UUID confirmedBy) {
@@ -212,6 +289,27 @@ public class Meeting {
             throw new ConflictException(
                     "예약이 확정된 모임은 예약 취소 절차를 통해 취소해야 합니다."
             );
+        }
+
+        this.status = MeetingStatus.CANCELED;
+        this.updatedAt = canceledAt;
+        this.updatedBy = canceledBy;
+    }
+
+    public void cancelByReservation(UUID canceledBy, LocalDateTime canceledAt) {
+        if (canceledBy == null) {
+            throw new IllegalArgumentException("취소자 ID는 필수입니다.");
+        }
+        if (canceledAt == null) {
+            throw new IllegalArgumentException("취소 시각은 필수입니다.");
+        }
+        if (this.status != MeetingStatus.CONFIRMED) {
+            throw new ConflictException(
+                    "예약이 확정된 모임만 예약 취소 절차로 취소할 수 있습니다."
+            );
+        }
+        if (!this.startAt.isAfter(canceledAt)) {
+            throw new ConflictException("이미 시작된 일정입니다.");
         }
 
         this.status = MeetingStatus.CANCELED;
@@ -280,5 +378,23 @@ public class Meeting {
 
     public LocalDateTime calculateNormalCheckoutStartAt() {
         return this.endAt.minusMinutes(20);
+    }
+
+    private static LocalDateTime responseDeadline(LocalDateTime now, LocalDateTime startAt) {
+        LocalDateTime deadline = now.plusHours(24);
+        if (deadline.isAfter(startAt.minusHours(24))) {
+            throw new IllegalArgumentException("응답 기간 24시간을 예약 마감 전에 확보해야 합니다.");
+        }
+        return deadline;
+    }
+
+    public void expireUnreserved(LocalDateTime now, UUID systemActor) {
+        if (status != MeetingStatus.PROPOSED || !now.isAfter(startAt.minusHours(24))) {
+            throw new ConflictException("예약 마감이 지난 제안만 취소할 수 있습니다.");
+        }
+        status = MeetingStatus.CANCELED;
+        cancellationReason = MeetingCancellationReason.RESERVATION_NOT_CONFIRMED;
+        updatedAt = now;
+        updatedBy = systemActor;
     }
 }

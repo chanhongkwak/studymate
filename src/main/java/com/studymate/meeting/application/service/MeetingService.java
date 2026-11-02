@@ -7,6 +7,8 @@ import com.studymate.meeting.application.dto.request.MeetingCreateRequest;
 import com.studymate.meeting.application.dto.request.MeetingUpdateRequest;
 import com.studymate.meeting.application.dto.response.MeetingResponse;
 import com.studymate.meeting.domain.Meeting;
+import com.studymate.meeting.domain.MeetingParticipant;
+import com.studymate.meeting.domain.MeetingParticipantRepository;
 import com.studymate.meeting.domain.MeetingRepository;
 import com.studymate.meeting.domain.MeetingRsvp;
 import com.studymate.meeting.domain.MeetingRsvpRepository;
@@ -25,6 +27,7 @@ import com.studymate.study.domain.StudyRepository;
 import com.studymate.study.domain.StudyStatus;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -44,6 +47,8 @@ public class MeetingService {
     private final StudyMemberRepository studyMemberRepository;
     private final MeetingRsvpRepository meetingRsvpRepository;
     private final BranchRepository branchRepository;
+    private final MeetingParticipantRepository meetingParticipantRepository;
+    private final MeetingResponseService meetingResponseService;
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -109,6 +114,23 @@ public class MeetingService {
 
         meetingRepository.save(meeting);
 
+        List<StudyMember> activeMembers =
+                studyMemberRepository.findAllByStudyIdAndStatus(
+                        studyId,
+                        StudyMemberStatus.ACTIVE
+                );
+
+        for (StudyMember studyMember : activeMembers) {
+            MeetingParticipant meetingParticipant = new MeetingParticipant(
+                    meeting.getId(),
+                    studyMember.getMemberId(),
+                    studyMember.getId(),
+                    memberId
+            );
+
+            meetingParticipantRepository.save(meetingParticipant);
+        }
+
         MeetingRsvp leaderRsvp = new MeetingRsvp(
                 meeting.getId(),           // 저장한 모임 ID
                 study.getLeaderMemberId(), // 응답 대상: 현재 그룹장
@@ -118,6 +140,8 @@ public class MeetingService {
         );
 
         meetingRsvpRepository.save(leaderRsvp);
+
+        meetingResponseService.closeIfAllResponded(meeting, memberId);
 
         return MeetingResponse.from(meeting);
     }
