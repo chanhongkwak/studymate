@@ -65,4 +65,49 @@ public interface JpaMeetingRepository extends JpaRepository<Meeting, UUID> {
 
     @Query("select m.studyId from Meeting m where m.id = :meetingId")
     Optional<UUID> findStudyIdById(@Param("meetingId") UUID meetingId);
+
+    @Query("""
+        select m
+        from Meeting m
+        where m.studyId = :studyId
+          and m.status = :status
+          and m.responseClosedAt is null
+          and m.responseDeadlineAt <= :cutoff
+        """)
+    List<Meeting> findDueForResponseClosure(
+            @Param("studyId") UUID studyId,
+            @Param("status") MeetingStatus status,
+            @Param("cutoff") LocalDateTime cutoff
+    );
+
+    @Query("""
+        select m
+        from Meeting m
+        where m.studyId = :studyId
+          and m.status = :status
+          and m.responseClosedAt is null
+          and m.responseDeadlineAt > :cutoff
+          and exists (
+              select p.id
+              from MeetingParticipant p
+              where p.meetingId = m.id
+                and p.studyMemberId = :studyMemberId
+          )
+        """)
+    List<Meeting> findOpenForParticipantDeparture(
+            @Param("studyId") UUID studyId,
+            @Param("studyMemberId") UUID studyMemberId,
+            @Param("status") MeetingStatus status,
+            @Param("cutoff") LocalDateTime cutoff
+    );
+    @Query("""
+        select distinct m.studyId from Meeting m, Study s
+        where s.id = m.studyId and s.deletedAt is null and m.status = :status
+          and ((m.responseClosedAt is null and m.responseDeadlineAt <= :now)
+               or m.startAt < :latestStart)
+        """)
+    List<UUID> findStudiesWithDueMeetings(MeetingStatus status, LocalDateTime now, LocalDateTime latestStart);
+
+    List<Meeting> findAllByStudyIdAndStatusAndStartAtBefore(UUID studyId, MeetingStatus status,
+                                                            LocalDateTime latestStart);
 }

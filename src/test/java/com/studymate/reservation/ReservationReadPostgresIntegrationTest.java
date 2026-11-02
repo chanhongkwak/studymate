@@ -38,7 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "RESERVATION_PG_TEST", matches = "true")
 @SpringBootTest(properties = {
     "spring.datasource.url=jdbc:postgresql://127.0.0.1:55438/reservation_read_test?ApplicationName=reservation-read-test",
-    "spring.datasource.username=postgres", "spring.datasource.password=",
+    "studymate.meeting.deadlines.enabled=false",
+        "spring.datasource.username=postgres", "spring.datasource.password=",
     "spring.datasource.driver-class-name=org.postgresql.Driver",
     "spring.datasource.hikari.connection-init-sql=SET statement_timeout = '15s'",
     "spring.jpa.hibernate.ddl-auto=create-drop",

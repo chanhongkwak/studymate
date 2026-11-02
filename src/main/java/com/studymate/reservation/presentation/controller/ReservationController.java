@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -67,6 +68,21 @@ public class ReservationController {
                         page,
                         size
                 );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/studies/{studyId}/reservations/{reservationId}/cancel")
+    public ResponseEntity<ReservationResponse> cancel(
+            @PathVariable UUID studyId,
+            @PathVariable UUID reservationId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        ReservationResponse response = reservationService.cancel(
+                studyId,
+                reservationId,
+                principal.getMemberId()
+        );
 
         return ResponseEntity.ok(response);
     }

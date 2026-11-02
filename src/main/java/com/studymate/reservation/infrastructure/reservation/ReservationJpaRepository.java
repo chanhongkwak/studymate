@@ -55,4 +55,21 @@ public interface ReservationJpaRepository extends JpaRepository<Reservation, UUI
             @Param("studyId") UUID studyId,
             Pageable pageable
     );
+
+    @Query("""
+        select (count(r) > 0)
+        from Reservation r
+        where r.reservationStatus = :status
+          and r.startAt > :now
+          and r.meetingId in (
+              select m.id
+              from Meeting m
+              where m.studyId = :studyId
+          )
+        """)
+    boolean existsFutureConfirmedReservation(
+            @Param("studyId") UUID studyId,
+            @Param("status") ReservationStatus status,
+            @Param("now") LocalDateTime now
+    );
 }
