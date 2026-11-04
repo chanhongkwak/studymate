@@ -14,6 +14,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.studymate.reservation.application.dto.request.ReservationCreateRequest;
 import com.studymate.reservation.application.dto.response.ReservationResponse;
 import com.studymate.reservation.application.service.ReservationService;
+import com.studymate.reservation.application.service.ReservationAttendanceService;
+import org.junit.jupiter.params.provider.CsvSource;
 import com.studymate.reservation.domain.branch.*;
 import com.studymate.reservation.domain.room.*;
 import com.studymate.reservation.domain.reservation.*;
@@ -49,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ReservationPostgresIntegrationTest {
     private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
     @Autowired ReservationService service;
+    @Autowired ReservationAttendanceService attendance;
     @Autowired MemberService memberService;
     @Autowired MemberRepository members;
     @Autowired BranchRepository branches;
@@ -364,13 +367,58 @@ class ReservationPostgresIntegrationTest {
     @AfterEach void clean() {
         // This context is hard-wired to reservation_test on 55437, never the development DB.
         tx(() -> {
-            for (String entity : List.of("WalletTransaction", "ReservationParticipant", "Reservation", "MeetingParticipant", "MeetingRsvp", "Meeting", "StudyMember", "Study", "Room", "Branch", "Wallet", "Member")) {
+            for (String entity : List.of("ReservationAttendance", "WalletTransaction", "ReservationParticipant", "Reservation", "MeetingParticipant", "MeetingRsvp", "Meeting", "StudyMember", "Study", "Room", "Branch", "Wallet", "Member")) {
                 em.createQuery("delete from " + entity).executeUpdate();
             }
             return null;
         });
     }
 
+    void atAttendanceTime(LocalDateTime time, Runnable request) {
+        try (var clock = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+            clock.when(() -> LocalDateTime.now(KOREA)).thenReturn(time);
+            request.run();
+        }
+    }
+
+    @Test void concurrentCheckInsAndCheckOutsRetainFirstCommittedTimes() throws Exception {
+        UUID id = reserve().id();
+        LocalDateTime in = start.plusMinutes(5);
+        LocalDateTime out = start.plusHours(1);
+        Runnable checkIn = () -> assertEquals(in, attendance.checkIn(studyId, id, leader).getCheckedInAt());
+        Runnable checkOut = () -> assertEquals(out, attendance.checkOut(studyId, id, leader).getCheckedOutAt());
+
+        runWhileStudyLocked(() -> atAttendanceTime(in, checkIn),
+                () -> atAttendanceTime(in.plusSeconds(1), checkIn));
+        runWhileStudyLocked(() -> atAttendanceTime(out, checkOut),
+                () -> atAttendanceTime(out.plusSeconds(1), checkOut));
+
+        var stored = attendance.getMyAttendance(studyId, id, leader);
+        assertEquals(in, stored.checkedInAt());
+        assertEquals(out, stored.checkedOutAt());
+        assertEquals(1L, tx(() -> count("ReservationAttendance")).longValue());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "10:10:59.999999, 10:50:00, PRESENT",
+            "10:11:00, 10:50:00, LATE",
+            "10:00:00, 10:49:59.999999, LEAVE_EARLY",
+            "10:00:00, 10:50:00, PRESENT",
+            "10:11:00, 10:49:59.999999, LATE"
+    })
+    void attendanceStatusAtMinuteBoundaries(LocalTime inTime, LocalTime outTime, AttendanceStatus expected) {
+        UUID id = reserve().id();
+        LocalDateTime in = start.toLocalDate().atTime(inTime);
+        LocalDateTime out = start.toLocalDate().atTime(outTime);
+        atAttendanceTime(in, () -> attendance.checkIn(studyId, id, leader));
+        atAttendanceTime(out, () -> attendance.checkOut(studyId, id, leader));
+        var stored = attendance.getMyAttendance(studyId, id, leader);
+        assertEquals(in, stored.checkedInAt());
+        assertEquals(out, stored.checkedOutAt());
+        assertEquals(expected, stored.sessions().getFirst().status());
+        assertEquals(AttendanceStatus.ABSENT, stored.sessions().getLast().status());
+    }
     @Test void createsReservationWithBalancedSplitAndPersistedDebits() {
         var response = reserve();
         assertEquals(List.of(33L, 33L, 34L), response.participants().stream().map(p -> p.amount()).sorted().toList());

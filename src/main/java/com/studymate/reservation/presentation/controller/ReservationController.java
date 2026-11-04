@@ -2,8 +2,10 @@ package com.studymate.reservation.presentation.controller;
 
 import com.studymate.auth.infrastructure.MemberPrincipal;
 import com.studymate.reservation.application.dto.request.ReservationCreateRequest;
+import com.studymate.reservation.application.dto.response.ReservationAttendanceResponse;
 import com.studymate.reservation.application.dto.response.ReservationPageResponse;
 import com.studymate.reservation.application.dto.response.ReservationResponse;
+import com.studymate.reservation.application.service.ReservationAttendanceService;
 import com.studymate.reservation.application.service.ReservationService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final ReservationAttendanceService reservationAttendanceService;
 
     @PostMapping("/reservations")
     public ResponseEntity<ReservationResponse> create(
@@ -54,6 +57,50 @@ public class ReservationController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/studies/{studyId}/reservations/{reservationId}/attendance/me")
+    public ResponseEntity<ReservationAttendanceResponse> getMyAttendance(
+            @PathVariable UUID studyId,
+            @PathVariable UUID reservationId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ){
+        ReservationAttendanceResponse response = reservationAttendanceService.getMyAttendance(
+                studyId,
+                reservationId,
+                principal.getMemberId()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/studies/{studyId}/reservations/{reservationId}/attendance/check-in")
+    public ResponseEntity<Void> checkIn(
+            @PathVariable UUID studyId,
+            @PathVariable UUID reservationId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ){
+        reservationAttendanceService.checkIn(
+                studyId,
+                reservationId,
+                principal.getMemberId()
+        );
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/studies/{studyId}/reservations/{reservationId}/attendance/check-out")
+    public ResponseEntity<Void> checkOut(
+            @PathVariable UUID studyId,
+            @PathVariable UUID reservationId,
+            @AuthenticationPrincipal MemberPrincipal principal
+    ){
+        reservationAttendanceService.checkOut(
+                studyId,
+                reservationId,
+                principal.getMemberId()
+        );
+
+        return ResponseEntity.noContent().build();
+    }
     @GetMapping("/studies/{studyId}/reservations")
     public ResponseEntity<ReservationPageResponse> getReservations(
             @PathVariable UUID studyId,
