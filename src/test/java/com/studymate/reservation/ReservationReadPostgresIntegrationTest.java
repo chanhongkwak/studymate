@@ -12,6 +12,9 @@ import com.studymate.reservation.domain.reservation.*;
 import com.studymate.study.domain.*;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import org.mockito.Mockito;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import java.util.*;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
@@ -105,6 +108,69 @@ class ReservationReadPostgresIntegrationTest {
         assertThrows(type, () -> service.getReservations(studyId, reader, 0, 10));
     }
 
+    @Test void attendanceApiRecordsFirstTimesAndClassifiesEachHour() throws Exception {
+        LocalDateTime end = start.plusHours(3);
+        Meeting meeting = new Meeting(studyId, branchId, "attendance", "description", 10, start, end, leader);
+        em.persist(meeting);
+        Reservation booking = new Reservation(meeting.getId(), roomId, start, end, 1, leader);
+        em.persist(booking);
+        meeting.confirm(leader);
+        em.persist(new ReservationParticipant(booking.getId(), viewer, 1, leader));
+        flushAndClear();
+        String base = listUrl() + "/" + booking.getId() + "/attendance";
+        ZoneId korea = ZoneId.of("Asia/Seoul");
+        LocalDateTime in = start.plusMinutes(30);
+        LocalDateTime out = start.plusHours(1).plusMinutes(49);
+        try (var clock = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+            clock.when(() -> LocalDateTime.now(korea)).thenReturn(in);
+            mvc.perform(post(base + "/check-in").with(as(viewer))).andExpect(status().isNoContent());
+            flushAndClear();
+            mvc.perform(get(base + "/me").with(as(viewer))).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.checkedInAt").value("2030-01-10T10:30:00"))
+                    .andExpect(jsonPath("$.checkedOutAt").doesNotExist())
+                    .andExpect(jsonPath("$.sessions").isEmpty());
+
+            clock.when(() -> LocalDateTime.now(korea)).thenReturn(out);
+            mvc.perform(post(base + "/check-in").with(as(viewer))).andExpect(status().isNoContent());
+            mvc.perform(post(base + "/check-out").with(as(viewer))).andExpect(status().isNoContent());
+            flushAndClear();
+            clock.when(() -> LocalDateTime.now(korea)).thenReturn(end.plusHours(1));
+            mvc.perform(post(base + "/check-out").with(as(viewer))).andExpect(status().isNoContent());
+            mvc.perform(get(base + "/me").with(as(viewer))).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.checkedInAt").value("2030-01-10T10:30:00"))
+                    .andExpect(jsonPath("$.checkedOutAt").value("2030-01-10T11:49:00"))
+                    .andExpect(jsonPath("$.sessions.length()").value(3))
+                    .andExpect(jsonPath("$.sessions[0].status").value("LATE"))
+                    .andExpect(jsonPath("$.sessions[1].status").value("LEAVE_EARLY"))
+                    .andExpect(jsonPath("$.sessions[2].status").value("ABSENT"));
+        }
+    }
+
+    @Test void missingCheckoutIsPendingUntilTheFirstClosedMinute() throws Exception {
+        String base = detailUrl() + "/attendance";
+        ZoneId korea = ZoneId.of("Asia/Seoul");
+        LocalDateTime end = start.plusHours(1);
+        try (var clock = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
+            clock.when(() -> LocalDateTime.now(korea)).thenReturn(start.minusMinutes(10));
+            mvc.perform(post(base + "/check-in").with(as(leader))).andExpect(status().isNoContent());
+            clock.when(() -> LocalDateTime.now(korea)).thenReturn(end.plusMinutes(11).minusNanos(1000));
+            mvc.perform(get(base + "/me").with(as(leader))).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sessions").isEmpty());
+            clock.when(() -> LocalDateTime.now(korea)).thenReturn(end.plusMinutes(11));
+            mvc.perform(post(base + "/check-out").with(as(leader))).andExpect(status().isConflict());
+            mvc.perform(get(base + "/me").with(as(leader))).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sessions[0].status").value("ABSENT"));
+        }
+    }
+
+    @Test void attendanceRequiresAuthenticationAndAReservationSeat() throws Exception {
+        String base = detailUrl() + "/attendance";
+        mvc.perform(get(base + "/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get(base + "/me").with(as(viewer))).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/check-in").with(as(viewer))).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/check-out").with(as(viewer))).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/check-out").with(as(leader))).andExpect(status().isConflict());
+    }
     @Test void activeNonParticipantCanReadStoredDetailIncludingZeroAmount() {
         var response = service.getReservation(studyId, reservationId, viewer);
         assertEquals(reservationId, response.id());
