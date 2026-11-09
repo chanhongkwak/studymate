@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Explicit, opt-in disposable database only; each test rolls back its own fixtures. */
 @EnabledIfEnvironmentVariable(named = "RESERVATION_PG_TEST", matches = "true")
 @SpringBootTest(properties = {
-    "spring.datasource.url=jdbc:postgresql://127.0.0.1:55438/reservation_read_test?ApplicationName=reservation-read-test",
+    "spring.datasource.url=jdbc:postgresql://127.0.0.1:15438/reservation_read_test?ApplicationName=reservation-read-test",
     "studymate.meeting.deadlines.enabled=false",
         "spring.datasource.username=postgres", "spring.datasource.password=",
     "spring.datasource.driver-class-name=org.postgresql.Driver",
@@ -63,7 +63,7 @@ class ReservationReadPostgresIntegrationTest {
     @BeforeEach void fixture() throws Exception {
         try (var connection = dataSource.getConnection()) {
             assertTrue(connection.getMetaData().getURL().startsWith(
-                    "jdbc:postgresql://127.0.0.1:55438/reservation_read_test"));
+                    "jdbc:postgresql://127.0.0.1:15438/reservation_read_test"));
         }
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         leader = member(); viewer = member(); outsider = member();
@@ -103,6 +103,16 @@ class ReservationReadPostgresIntegrationTest {
     }
     String listUrl() { return "/api/studies/" + studyId + "/reservations"; }
     String detailUrl() { return listUrl() + "/" + reservationId; }
+    String grantBody(UUID bookingId, UUID memberId, AttendanceAction action) throws Exception {
+        UUID participantId = em.createQuery("select p.id from ReservationParticipant p where p.reservationId=:r and p.memberId=:m", UUID.class)
+                .setParameter("r", bookingId).setParameter("m", memberId).getSingleResult();
+        String token = UUID.randomUUID().toString();
+        String hash = HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        em.persist(new ReservationAttendanceGrant(participantId, hash, action));
+        em.flush();
+        return "{\"grantToken\":\"" + token + "\"}";
+    }
     void assertBothDenied(Class<? extends Throwable> type, UUID reader) {
         assertThrows(type, () -> service.getReservation(studyId, reservationId, reader));
         assertThrows(type, () -> service.getReservations(studyId, reader, 0, 10));
@@ -123,7 +133,8 @@ class ReservationReadPostgresIntegrationTest {
         LocalDateTime out = start.plusHours(1).plusMinutes(49);
         try (var clock = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
             clock.when(() -> LocalDateTime.now(korea)).thenReturn(in);
-            mvc.perform(post(base + "/check-in").with(as(viewer))).andExpect(status().isNoContent());
+            String inBody = grantBody(booking.getId(), viewer, AttendanceAction.CHECK_IN);
+            mvc.perform(post(base + "/check-in").with(as(viewer)).contentType("application/json").content(inBody)).andExpect(status().isNoContent());
             flushAndClear();
             mvc.perform(get(base + "/me").with(as(viewer))).andExpect(status().isOk())
                     .andExpect(jsonPath("$.checkedInAt").value("2030-01-10T10:30:00"))
@@ -131,11 +142,12 @@ class ReservationReadPostgresIntegrationTest {
                     .andExpect(jsonPath("$.sessions").isEmpty());
 
             clock.when(() -> LocalDateTime.now(korea)).thenReturn(out);
-            mvc.perform(post(base + "/check-in").with(as(viewer))).andExpect(status().isNoContent());
-            mvc.perform(post(base + "/check-out").with(as(viewer))).andExpect(status().isNoContent());
+            mvc.perform(post(base + "/check-in").with(as(viewer)).contentType("application/json").content(inBody)).andExpect(status().isConflict());
+            String outBody = grantBody(booking.getId(), viewer, AttendanceAction.CHECK_OUT);
+            mvc.perform(post(base + "/check-out").with(as(viewer)).contentType("application/json").content(outBody)).andExpect(status().isNoContent());
             flushAndClear();
             clock.when(() -> LocalDateTime.now(korea)).thenReturn(end.plusHours(1));
-            mvc.perform(post(base + "/check-out").with(as(viewer))).andExpect(status().isNoContent());
+            mvc.perform(post(base + "/check-out").with(as(viewer)).contentType("application/json").content(outBody)).andExpect(status().isConflict());
             mvc.perform(get(base + "/me").with(as(viewer))).andExpect(status().isOk())
                     .andExpect(jsonPath("$.checkedInAt").value("2030-01-10T10:30:00"))
                     .andExpect(jsonPath("$.checkedOutAt").value("2030-01-10T11:49:00"))
@@ -152,12 +164,14 @@ class ReservationReadPostgresIntegrationTest {
         LocalDateTime end = start.plusHours(1);
         try (var clock = Mockito.mockStatic(LocalDateTime.class, Mockito.CALLS_REAL_METHODS)) {
             clock.when(() -> LocalDateTime.now(korea)).thenReturn(start.minusMinutes(10));
-            mvc.perform(post(base + "/check-in").with(as(leader))).andExpect(status().isNoContent());
+            mvc.perform(post(base + "/check-in").with(as(leader)).contentType("application/json")
+                    .content(grantBody(reservationId, leader, AttendanceAction.CHECK_IN))).andExpect(status().isNoContent());
             clock.when(() -> LocalDateTime.now(korea)).thenReturn(end.plusMinutes(11).minusNanos(1000));
             mvc.perform(get(base + "/me").with(as(leader))).andExpect(status().isOk())
                     .andExpect(jsonPath("$.sessions").isEmpty());
             clock.when(() -> LocalDateTime.now(korea)).thenReturn(end.plusMinutes(11));
-            mvc.perform(post(base + "/check-out").with(as(leader))).andExpect(status().isConflict());
+            mvc.perform(post(base + "/check-out").with(as(leader)).contentType("application/json")
+                    .content(grantBody(reservationId, leader, AttendanceAction.CHECK_OUT))).andExpect(status().isConflict());
             mvc.perform(get(base + "/me").with(as(leader))).andExpect(status().isOk())
                     .andExpect(jsonPath("$.sessions[0].status").value("ABSENT"));
         }
@@ -167,9 +181,9 @@ class ReservationReadPostgresIntegrationTest {
         String base = detailUrl() + "/attendance";
         mvc.perform(get(base + "/me")).andExpect(status().isUnauthorized());
         mvc.perform(get(base + "/me").with(as(viewer))).andExpect(status().isForbidden());
-        mvc.perform(post(base + "/check-in").with(as(viewer))).andExpect(status().isForbidden());
-        mvc.perform(post(base + "/check-out").with(as(viewer))).andExpect(status().isForbidden());
-        mvc.perform(post(base + "/check-out").with(as(leader))).andExpect(status().isConflict());
+        mvc.perform(post(base + "/check-in").with(as(viewer)).contentType("application/json").content("{\"grantToken\":\"invalid\"}")).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/check-out").with(as(viewer)).contentType("application/json").content("{\"grantToken\":\"invalid\"}")).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/check-out").with(as(leader))).andExpect(status().isBadRequest());
     }
     @Test void activeNonParticipantCanReadStoredDetailIncludingZeroAmount() {
         var response = service.getReservation(studyId, reservationId, viewer);
@@ -181,6 +195,10 @@ class ReservationReadPostgresIntegrationTest {
         assertEquals(1, response.totalAmount());
         assertEquals(ReservationStatus.CONFIRMED, response.reservationStatus());
         assertEquals(2, response.participants().size());
+        for (var participant : response.participants()) {
+            assertNotNull(participant.participantId());
+            assertEquals(participant.memberId(), em.find(ReservationParticipant.class, participant.participantId()).getMemberId());
+        }
         assertTrue(response.participants().stream().anyMatch(p -> p.memberId().equals(outsider) && p.amount() == 0));
         assertTrue(response.participants().stream().noneMatch(p -> p.memberId().equals(viewer)));
     }
