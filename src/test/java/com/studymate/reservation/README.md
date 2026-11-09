@@ -48,12 +48,12 @@ Reports: `build/reports/tests/test/index.html` and
 ## Reservation detail and list tests (2026-10-28)
 
 `ReservationReadPostgresIntegrationTest` uses a separate disposable database:
-`127.0.0.1:55438/reservation_read_test`. It never uses the development datasource.
+`127.0.0.1:15438/reservation_read_test`. It never uses the development datasource.
 The opt-in variable is also `RESERVATION_PG_TEST=true`; without it the class is skipped.
 Each test rolls back its fixtures, and the Spring context uses `create-drop`.
 
 ```powershell
-docker run --detach --name studymate-reservation-read-test -e POSTGRES_DB=reservation_read_test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:55438:5432 postgres:16
+docker run --detach --name studymate-reservation-read-test -e POSTGRES_DB=reservation_read_test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:15438:5432 postgres:16
 docker exec studymate-reservation-read-test pg_isready -U postgres -d reservation_read_test
 $env:JAVA_HOME='C:\Users\User\.jdks\ms-21.0.10'
 $env:RESERVATION_PG_TEST='true'
@@ -129,3 +129,46 @@ Only this cancellation suite was executed for this change; existing full
 creation/read suites were not rerun. No production code was changed by the test
 work. XML report:
 `build/test-results/test/TEST-com.studymate.reservation.ReservationCancelPostgresIntegrationTest.xml`.
+
+## QR and attendance verification (2026-11-09)
+
+Verified **72 tests, 0 failures/errors/skips** using Java 21 and PostgreSQL 16:
+
+- `ReservationQrCodeServiceTest`: 25 unit test cases. Updated constructor mocks;
+  added scan action selection, hash persistence, independent personal-token lifetime,
+  exact expiry, owner/action denial, attendance windows, and operator authorization.
+- `ReservationQrPostgresIntegrationTest`: 9 real-transaction tests. HTTP open/issue/
+  scan/check-in/check-out/read flow; delegate and handover endpoints; old operator
+  denial and surviving tokens; expiry and check-in deadline; concurrent opening and
+  one-use consumption; forced grant UPDATE failure rolls attendance back and permits retry.
+- `ReservationReadPostgresIntegrationTest`: 38 regression tests. Existing attendance
+  API requests now carry personal grants; consumed-token retry expects 409; participant
+  response IDs are checked against actual persisted seats.
+
+The read suite now uses port **15438**, since Windows rejected binding 55438 on this
+machine. The QR suite is hard-wired to **15440/reservation_qr_test**, guarded by
+`RESERVATION_PG_TEST=true`, and uses `create-drop`. Never substitute development URLs.
+
+```powershell
+docker run --detach --name studymate-qr-test -e POSTGRES_DB=reservation_qr_test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:15440:5432 postgres:16
+docker run --detach --name studymate-read-test -e POSTGRES_DB=reservation_read_test -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1:15438:5432 postgres:16
+docker exec studymate-qr-test pg_isready -U postgres -d reservation_qr_test
+docker exec studymate-read-test pg_isready -U postgres -d reservation_read_test
+$env:JAVA_HOME='C:\Users\User\.jdks\ms-21.0.10'
+$env:RESERVATION_PG_TEST='true'
+try {
+    .\gradlew.bat test --tests com.studymate.reservation.ReservationQrCodeServiceTest --tests com.studymate.reservation.ReservationQrPostgresIntegrationTest --tests com.studymate.reservation.ReservationReadPostgresIntegrationTest --console=plain
+} finally {
+    docker rm --force --volumes studymate-qr-test studymate-read-test
+    Remove-Item Env:RESERVATION_PG_TEST
+}
+```
+
+Use unused container names and wait for readiness before Gradle. QR fixtures directly
+persist reservations to isolate attendance; this is not a reservation-creation E2E test.
+HTTP tests use authenticated test principals, not real JWT issuance/signature validation.
+Concurrency tests synchronize two worker starts, use real commits and PostgreSQL locks,
+and verify persisted outcomes; they do not force every possible scheduling order.
+Only tests and this document were changed. Reservation creation/cancellation and the
+full project test suite were not rerun. The two disposable review containers were
+removed after verification; the development database was not used.

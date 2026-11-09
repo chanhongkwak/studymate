@@ -24,6 +24,8 @@ import com.studymate.reservation.domain.branch.BranchStatus;
 import com.studymate.reservation.domain.reservation.Reservation;
 import com.studymate.reservation.domain.reservation.ReservationParticipant;
 import com.studymate.reservation.domain.reservation.ReservationParticipantRepository;
+import com.studymate.reservation.domain.reservation.ReservationQrManagement;
+import com.studymate.reservation.domain.reservation.ReservationQrManagementRepository;
 import com.studymate.reservation.domain.reservation.ReservationRepository;
 import com.studymate.reservation.domain.reservation.ReservationStatus;
 import com.studymate.reservation.domain.room.Room;
@@ -76,6 +78,7 @@ public class ReservationService {
     private final MeetingRsvpRepository meetingRsvpRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionService walletTransactionService;
+    private final ReservationQrManagementRepository reservationQrManagementRepository;
 
     @Transactional
     public ReservationResponse create(
@@ -257,6 +260,13 @@ public class ReservationService {
 
 // 예약 ID 확보 — 아직 커밋은 아님
         Reservation savedReservation = reservationRepository.save(reservation);
+
+        ReservationQrManagement qrManagement = new ReservationQrManagement(
+                savedReservation.getId(),
+                memberId
+        );
+
+        reservationQrManagementRepository.save(qrManagement);
 
 // 실제 참석자 목록: 뒤에서 참석자 저장에도 사용
         List<UUID> debitMemberIds = new ArrayList<>(amountByMemberId.keySet());
